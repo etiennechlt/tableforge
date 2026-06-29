@@ -1,0 +1,9 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>{{ css }}</style></head>
+<body style="margin:0;background:#0c0a08">
+  <div class="forge-asset">
+    <div class="art"{% if art_url %} style="background-image:url('{{ art_url }}')"{% endif %}></div>
+    {% if cost is not none %}<div class="cost">{{ cost }}</div>{% endif %}
+    <div class="title">{{ name }}</div>
+    <div class="eff">{{ eff }}</div>
+  </div>
+</body></html>

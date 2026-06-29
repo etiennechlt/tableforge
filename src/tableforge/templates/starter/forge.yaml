@@ -1,0 +1,29 @@
+project: __PROJECT_NAME__
+
+provider:
+  base_url: https://ark.ap-southeast.bytepluses.com/api/v3
+  api_key_env: ARK_API_KEY          # NOM de la variable d'env (jamais la clé)
+  model: seedream-5-0-260128
+  default_size: "4704x3520"
+  watermark: false
+
+defaults:
+  max_refs: 3
+  ref_max_px: 1024
+
+kinds:
+  cards:
+    data: data/cards.yaml
+    prompts: prompts/cards.yaml
+    template: templates/card
+    capture_selector: ".forge-asset"
+    render_size: { width: 744, height: 1039 }   # 63×88 mm @300 dpi
+    scale: 3
+    sheet:
+      page: A4
+      cols: 3
+      rows: 3
+      card_w_mm: 63
+      card_h_mm: 88
+      gap_mm: 4
+      cut_marks: true

@@ -1,0 +1,9 @@
+@import url('../tokens.css');
+.forge-asset{width:744px;height:1039px;position:relative;background:var(--paper);
+  border-radius:var(--card-radius);overflow:hidden;font-family:Georgia,serif;color:var(--ink)}
+.art{position:absolute;inset:0 0 38% 0;background:#1a1712 center/cover no-repeat}
+.cost{position:absolute;top:18px;left:18px;width:54px;height:54px;border-radius:50%;
+  background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:28px;font-weight:bold}
+.title{position:absolute;top:60%;left:0;right:0;text-align:center;font-size:34px;font-weight:bold}
+.eff{position:absolute;top:70%;left:32px;right:32px;font-size:22px;color:var(--muted)}

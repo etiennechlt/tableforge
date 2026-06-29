@@ -1,0 +1,11 @@
+art_direction: >-
+  Painterly fantasy illustration, single centered subject, cinematic light,
+  muted palette. No text, no border, illustration only, full-bleed.
+negative: >-
+  Avoid: text, letters, watermark, card frame, border, modern objects.
+style_refs: []          # ajoute ici des chemins vers reference/xxx.png pour l'i2i
+prompts:
+  heros: "A lone armored hero standing on a windswept ridge at dusk."
+  relique: "An ancient glowing relic resting on a stone altar in shadow."
+# overrides:
+#   relique: { suffix: "Add a faint magical glow.", style_refs: [reference/relique-ref.png] }

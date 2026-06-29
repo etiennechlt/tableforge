@@ -1,0 +1,3 @@
+rows:
+  - { id: heros,   name: "Héros",   cost: 3, eff: "Un exemple de carte.",          qty: 2 }
+  - { id: relique, name: "Relique", cost: 5, eff: "Une autre carte d'exemple.",    qty: 1 }
