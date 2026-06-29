@@ -1,0 +1,48 @@
+art_direction: >-
+  Dark medieval fantasy trading-card illustration, painterly digital gouache with the
+  weathered texture of an aged illuminated manuscript. A single centered subject, medium
+  shot, strong cinematic chiaroscuro: one warm candle-gold key light against deep cold
+  shadow. Muted grim palette — ash grey, weathered stone, oxblood red, candle gold;
+  desaturated, somber. Visible hand-painted brushwork, fine detail, subtle parchment grain,
+  slightly hazy atmospheric background that only suggests the setting. Cohesive concept-art
+  look. No text, no letters, no card frame, no border, no UI — illustration only, full-bleed.
+
+negative: >-
+  Avoid: any text, letters, captions, watermark, logo, signature; card frame, border or UI;
+  modern objects, photographic realism, bright cheerful colors; multiple disconnected
+  subjects, cluttered composition; deformed hands or anatomy.
+
+style_refs:
+  - reference/02-Lame.png
+  - reference/00-exemple-personnage.png
+
+_corruption: &corruption >-
+  Corrupted variant: introduce a sickly ether glow of violet and teal as the only saturated
+  color, drifting grey ash and orange embers, hairline cracks leaking faint pale light, an
+  oppressive cursed atmosphere — darker and colder than the base style.
+
+overrides:
+  pacte-d-ether:    { suffix: *corruption, style_refs: [reference/XX-Couronne-Maudite.png] }
+  legion-damnee:    { suffix: *corruption, style_refs: [reference/XX-Couronne-Maudite.png] }
+  couronne-maudite: { suffix: *corruption, style_refs: [reference/XX-Couronne-Maudite.png] }
+  cendres-vivantes: { suffix: *corruption, style_refs: [reference/XX-Couronne-Maudite.png] }
+
+prompts:
+  plaidoyer: "A ragged commoner kneeling on cold stone steps, one hand raised in earnest plea, clutching a rolled petition; towering shadowed figures of authority loom out of focus above. A scene of words and supplication, no weapons."
+  lame: "A weary low-ranking footman in a patched gambeson gripping a plain, nicked iron sword point-down in the mud of a barracks yard; a forge glows dull orange behind him. Humble, grounded, martial."
+  emissaire: "A hooded emissary in a dust-worn traveling cloak holding out a sealed letter with a red wax seal, a faint diplomatic smile; the blurred banners of a foreign faction behind. Quiet, persuasive."
+  marchandage: "Close on two hands over a wooden market stall exchanging a small stack of gold coins for goods, a merchant's shrewd eyes just visible; crates, scales and hanging wares blur behind. Lively haggling."
+  glanage: "A stooped peasant gleaning the last grain at the ragged edge of a harvested field at dusk, a half-full wicker basket of provisions at the hip; the wild borderlands stretch grey beyond. Toil and scarcity."
+  patrouille: "Two spear-carrying levy guards walking a muddy border road at blue dusk, lantern light, breath misting; a watchtower silhouette ahead. Watchful, cold, ordinary duty."
+  anneau-du-sceau: "Extreme close-up of an ornate gold signet ring pressing into a pool of blood-red wax, the crest crisp and glinting, a single warm light catching the metal, everything else in deep shadow; a faint magical sheen on the gold. Iconic, a key object."
+  edit-royal: "An unfurled royal decree on heavy parchment, weighted by a golden crown-stamped wax seal and a red ribbon, a quill and a few gold coins beside it on a dark oak desk lit by candlelight. Authority and gold."
+  recruteur: "A grizzled recruiting sergeant at a wooden table outside a barracks, pointing a calloused finger toward the gate as a nervous young villager makes his mark on a muster roll; spears stacked behind. Decisive."
+  caravane-marchande: "A laden merchant caravan of canvas-covered wagons and pack mules passing through a town gate at golden hour, crates and bound bales heavy with trade, a fat coin-purse in view. Wealth in motion."
+  chevalier-errant: "A lone armored knight-errant on a dark warhorse cresting a windswept ridge, lance upright, a tattered personal pennant snapping, distant grey hills. Noble, solitary, martial."
+  maitre-de-guilde: "A prosperous guild master in rich fur-trimmed robes and a heavy chain of office, standing among ledgers, coin scales and bolts of cloth in a warm guildhall, a knowing half-smile. Influence and gold."
+  pretresse: "A serene priestess in pale robes within a candlelit temple, raising a softly glowing censer; threads of clean golden light dispel a faint dark haze at the edges of the frame. Purity against corruption."
+  banneret: "An armored banner-captain on foot, sword raised, rallying a tight rank of soldiers beneath a large heraldic banner; embers and dust in shafts of light, fierce determination. Command and battle."
+  pacte-d-ether: "A cloaked figure in a ruined sanctuary pressing a bare hand to a floating, fractured ether crystal that pulses sickly violet-teal; glowing tendrils of ether crawl up the arm, ash drifting in the cold dark. A forbidden bargain."
+  legion-damnee: "A column of damned soldiers in blackened, ash-caked armor marching out of smoke, hollow eyes lit with faint ether-fire, embers and grey ash swirling around their boots. Relentless, dreadful, numerous."
+  couronne-maudite: "A blackened, thorn-wrought crown levitating above an empty throne, wreathed in cold violet ether flames, ash spiralling up into darkness, hairline cracks leaking pale light. Cursed majesty, the heart of corruption."
+  cendres-vivantes: "A humanoid creature half-formed from swirling living ash and glowing embers, cracks of violet-teal light running through its ashen body as it rises from a smoldering sanctuary floor. Power born of corruption."

@@ -1,0 +1,37 @@
+/* Couronnes & Cendres — tokens de design (couleurs, typographie)
+   Source de vérité du look & feel, partagée par la face illustrée et le plateau.
+   Couleurs alignées sur le matériel imprimé (cf. docs/04-direction-artistique.md). */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+  /* Encres & supports sombres */
+  --cc-ink:        #14110e;   /* noir-brun de fond */
+  --cc-frame:      #29231d;   /* cadre */
+  --cc-frame-hi:   #3a322a;   /* arête haute du cadre */
+  --cc-parchment:  #ece2cb;   /* texte clair sur sombre */
+  --cc-parchment-dim: #b3a583;
+  --cc-shadow:     rgba(0,0,0,.55);
+
+  /* Or (enluminure / filets) */
+  --cc-gold:       #c9a24b;
+  --cc-gold-deep:  #8f6e2e;
+
+  /* Braise / corruption / cendres */
+  --cc-ember:      #c24a2a;
+  --cc-ember-hi:   #e0673f;
+  --cc-ember-glow: rgba(194,74,42,.40);
+
+  /* Accents de catégorie */
+  --cc-depart:     #8d8a7e;   /* acier (départ) */
+  --cc-marche:     #2aa17c;   /* teal (marché) */
+  --cc-premium:    #c24a2a;   /* braise (premium) */
+
+  /* Bandeaux de zones */
+  --cc-deploy-bg:  #efe7d4;
+  --cc-deploy-ink: #2b2620;
+  --cc-reveal-bg:  #1b1712;
+
+  /* Typographie */
+  --cc-display: 'Cinzel', 'Times New Roman', serif;     /* capitales gravées, héraldique */
+  --cc-body:    'EB Garamond', Georgia, serif;          /* corps lisible, élégant */
+}

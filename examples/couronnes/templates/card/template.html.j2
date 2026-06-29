@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><style>{{ css }}</style></head>
+<body style="margin:0;background:#0c0a08">
+  {% set cat_label = {"depart":"Départ","marche":"Marché","premium":"Premium corrompue"}[cat] %}
+  <div class="cc-card" data-cat="{{ cat }}">
+    <div class="cc-art"{% if art_url %} style="background-image:url('{{ art_url }}')"{% endif %}></div>
+    <span class="cc-fleuron tl"></span><span class="cc-fleuron tr"></span>
+    <span class="cc-fleuron bl"></span><span class="cc-fleuron br"></span>
+    {% if cost is not none %}<div class="cc-seal cc-seal--cost">{{ cost }}</div>{% endif %}
+    {% if corr is not none %}<div class="cc-seal cc-seal--corr">+{{ corr }}</div>
+    <div class="cc-corr-label">corruption</div>{% endif %}
+    <div class="cc-titleblock">
+      <div class="cc-name">{{ name }}</div>
+      <div class="cc-cat">{{ cat_label }}</div>
+    </div>
+    <div class="cc-deploy">
+      <div class="cc-label">Déploiement</div>
+      {% if seal %}<span class="cc-chip">{{ seal }}</span>
+      {% else %}<span class="cc-chip cc-chip--none">Aucun déploiement</span>{% endif %}
+      <div class="cc-eff">{{ eff }}</div>
+    </div>
+    <div class="cc-reveal">
+      <div class="cc-stat cc-stat--inf"><div class="cc-lab">Influence</div><div class="cc-val">{{ inf }}</div></div>
+      <div class="cc-stat cc-stat--force"><div class="cc-lab">Force</div><div class="cc-val">{{ force }}</div></div>
+    </div>
+  </div>
+</body></html>

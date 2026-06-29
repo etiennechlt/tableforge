@@ -1,0 +1,19 @@
+rows:
+  - { id: plaidoyer,       cat: depart, name: "Plaidoyer",        cost: null, corr: null, seal: null,                  eff: "Carte de pure révélation : aucune action sur le plateau.", inf: 2, force: 0, qty: 2 }
+  - { id: lame,            cat: depart, name: "Lame",             cost: null, corr: null, seal: "Caserne",             eff: "Gagner 1 Fer.",                                           inf: 0, force: 1, qty: 2 }
+  - { id: emissaire,       cat: depart, name: "Émissaire",        cost: null, corr: null, seal: "Faction (au choix)",  eff: "+1 influence sur la piste choisie.",                      inf: 1, force: 0, qty: 1 }
+  - { id: marchandage,     cat: depart, name: "Marchandage",      cost: null, corr: null, seal: "Marché",              eff: "Gagner 2 Or.",                                            inf: 1, force: 0, qty: 1 }
+  - { id: glanage,         cat: depart, name: "Glanage",          cost: null, corr: null, seal: "Confins",             eff: "Gagner 2 Vivres.",                                        inf: 0, force: 1, qty: 1 }
+  - { id: patrouille,      cat: depart, name: "Patrouille",       cost: null, corr: null, seal: "Région (au choix)",   eff: "Placer 1 unité dans cette région.",                       inf: 0, force: 1, qty: 1 }
+  - { id: anneau-du-sceau, cat: depart, name: "Anneau du Sceau",  cost: null, corr: null, seal: "Joker",               eff: "Aller sur tout espace libre et déclencher l'action du lieu.", inf: 1, force: 1, qty: 1 }
+  - { id: edit-royal,      cat: depart, name: "Édit Royal",       cost: null, corr: null, seal: "Couronne",            eff: "+1 influence Couronne et gagner 1 Or.",                   inf: 1, force: 0, qty: 1 }
+  - { id: recruteur,           cat: marche, name: "Recruteur",          cost: 2, corr: null, seal: "Caserne",        eff: "Placer 1 unité, puis épurer 1 carte de ta main.",          inf: 0, force: 1, qty: 1 }
+  - { id: caravane-marchande,  cat: marche, name: "Caravane Marchande", cost: 3, corr: null, seal: "Marché",         eff: "Gagner 3 Or. Variante : gagner 1 Or et piocher 1 carte.",  inf: 2, force: 0, qty: 1 }
+  - { id: chevalier-errant,    cat: marche, name: "Chevalier Errant",   cost: 4, corr: null, seal: "Région",         eff: "Placer 2 unités dans cette région.",                       inf: 1, force: 2, qty: 1 }
+  - { id: maitre-de-guilde,    cat: marche, name: "Maître de Guilde",   cost: 5, corr: null, seal: "Guildes",        eff: "+1 influence Guildes, gagner 2 Or et piocher 1 carte.",    inf: 3, force: 0, qty: 1 }
+  - { id: pretresse,           cat: marche, name: "Prêtresse",          cost: 5, corr: null, seal: "Temple",         eff: "+1 influence Temple, puis retirer 1 corruption de ton sac.", inf: 2, force: 1, qty: 1 }
+  - { id: banneret,            cat: marche, name: "Banneret",           cost: 6, corr: null, seal: "Caserne / Cité", eff: "Placer 2 unités, gagner 1 Fer et piocher 1 carte.",        inf: 2, force: 3, qty: 1 }
+  - { id: pacte-d-ether,    cat: premium, name: "Pacte d'Éther",     cost: 5, corr: 1, seal: "Sanctuaire", eff: "Gagner 2 Éther et piocher 1 carte.",                                                  inf: 3, force: 1, qty: 1 }
+  - { id: legion-damnee,    cat: premium, name: "Légion Damnée",     cost: 6, corr: 2, seal: "Caserne",    eff: "Placer 3 unités et gagner 1 Fer.",                                                    inf: 1, force: 4, qty: 1 }
+  - { id: couronne-maudite, cat: premium, name: "Couronne Maudite",  cost: 7, corr: 2, seal: "Couronne",   eff: "+2 influence Couronne et gagner 2 Or. Surcharge (+1 corruption) : piocher 2 cartes.",  inf: 4, force: 0, qty: 1 }
+  - { id: cendres-vivantes, cat: premium, name: "Cendres Vivantes",  cost: 5, corr: 1, seal: "Sanctuaire", eff: "Convertir X corruption de ton sac en X Force pour ce conflit.",                        inf: 2, force: 1, qty: 1 }
