@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tableforge.config import load_project
 from tableforge.generate import generate_kind
 
@@ -48,3 +50,28 @@ def test_dry_run_single_id(tmp_path):
     project = _project(tmp_path)
     results = generate_kind(project, "cards", ids=["lame"], dry_run=True)
     assert [r.id for r in results] == ["lame"]
+
+
+def test_kind_without_prompts_raises(tmp_path):
+    forge = FORGE.replace("    prompts: prompts/cards.yaml\n", "")
+    (tmp_path / "forge.yaml").write_text(forge, encoding="utf-8")
+    project = load_project(tmp_path)
+    with pytest.raises(ValueError, match="prompts"):
+        generate_kind(project, "cards", dry_run=True)
+
+
+def test_skips_existing_art_without_force(tmp_path):
+    project = _project(tmp_path)
+    art = project.root / "out" / "art" / "cards" / "lame.png"
+    art.parent.mkdir(parents=True)
+    art.write_bytes(b"x")
+
+    class FakeProvider:
+        def generate(self, *a, **k):  # pragma: no cover - must not be called
+            raise AssertionError("ne doit pas régénérer")
+
+        def build(self, *a, **k):
+            return {}
+
+    results = generate_kind(project, "cards", ids=["lame"], provider=FakeProvider())
+    assert results[0].request == {"skipped": "exists"}

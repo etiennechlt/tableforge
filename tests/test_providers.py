@@ -49,3 +49,28 @@ def test_provider_build_injects_prompt(monkeypatch):
     req = provider.build("hello", size="32x32", refs=["a"])
     assert req["prompt"] == "hello"
     assert req["size"] == "32x32"
+
+
+def test_save_image_from_b64(tmp_path):
+    import base64
+
+    from tableforge.providers import _save_image
+
+    class Item:
+        b64_json = base64.b64encode(b"PNGDATA").decode()
+        url = None
+
+    dest = tmp_path / "x.png"
+    _save_image(Item(), dest)
+    assert dest.read_bytes() == b"PNGDATA"
+
+
+def test_save_image_without_data_raises(tmp_path):
+    from tableforge.providers import _save_image
+
+    class Empty:
+        b64_json = None
+        url = None
+
+    with pytest.raises(RuntimeError, match="sans image"):
+        _save_image(Empty(), tmp_path / "x.png")
