@@ -12,3 +12,6 @@ htmlcov/
 
 # Generated artefacts
 out/
+
+# Orchestration (scratch de revue)
+.superpowers/
