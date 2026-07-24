@@ -28,7 +28,8 @@ def init(name: str, dest: Path = typer.Option(Path("."), "--dest", help="Dossier
 
 @app.command("list")
 def list_kinds(project: Path = ProjectOpt):
-    """Liste les kinds déclarés."""
+    """Liste les kinds déclarés + diagnostics de configuration."""
+    from .providers.base import validate_project
     cfg = load_project(project)
     for name, kind in cfg.kinds.items():
         flags = []
@@ -36,10 +37,17 @@ def list_kinds(project: Path = ProjectOpt):
             flags.append("data" if kind.data.exists() else "data?")
         if kind.prompts:
             flags.append("prompts" if kind.prompts.exists() else "prompts?")
-        if kind.template:
+        if kind.template is not None:
             flags.append("template" if kind.template.exists() else "template?")
         sheet = " +sheet" if kind.sheet else ""
-        typer.echo(f"- {name}: {', '.join(flags)}{sheet}")
+        provider = kind.generate.with_ if kind.generate and kind.generate.with_ else "auto"
+        typer.echo(f"- {name} [{kind.asset} via {provider}]: {', '.join(flags)}{sheet}")
+    issues = validate_project(cfg)
+    if issues:
+        typer.echo("problèmes de configuration :")
+        for issue in issues:
+            typer.echo(f"  ! {issue}")
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -55,9 +63,38 @@ def generate(kind: str, project: Path = ProjectOpt,
         typer.echo(f"{res.id}: {where}")
 
 
+@app.command()
+def studio(kind: str, project: Path = ProjectOpt,
+           id: Optional[List[str]] = typer.Option(None, "--id", help="Limiter à ces ids.")):
+    """Fiches studio : texte, réglages, destination, URL de l'écran web."""
+    from .studio import studio_cards
+    cfg = load_project(project)
+    for card in studio_cards(cfg, kind, ids=id or None):
+        typer.echo(f"=== {card.kind}/{card.id}")
+        if card.url:
+            typer.echo(f"    écran   : {card.url}")
+        typer.echo(f"    texte   : {card.text}")
+        if card.settings:
+            settings = ", ".join(f"{k}={v}" for k, v in sorted(card.settings.items()))
+            typer.echo(f"    réglages: {settings}")
+        for note in card.notes:
+            typer.echo(f"    note    : {note}")
+        typer.echo(f"    déposer : {card.dest}")
+
+
+def _require_image_kind(kind_cfg, kind: str) -> None:
+    if kind_cfg.asset != "image":
+        from .paths import MODALITY_BY_ASSET
+        modality = MODALITY_BY_ASSET.get(kind_cfg.asset, kind_cfg.asset)
+        raise typer.BadParameter(
+            f"le kind '{kind}' est {modality} ({kind_cfg.asset}) — rien à rendre ; "
+            "utilise forge generate")
+
+
 def _render_kind(cfg, kind: str, only: Optional[List[str]]):
     from .render import render_png
     kind_cfg = cfg.kind(kind)
+    _require_image_kind(kind_cfg, kind)
     if kind_cfg.template is None or kind_cfg.render_size is None:
         raise typer.BadParameter(
             f"le kind '{kind}' n'a pas de template — rien à rendre")
@@ -95,6 +132,7 @@ def sheet(kind: str, project: Path = ProjectOpt):
     from .sheet import build_sheet_pdf, plan_sheet
     cfg = load_project(project)
     kind_cfg = cfg.kind(kind)
+    _require_image_kind(kind_cfg, kind)
     if kind_cfg.sheet is None or kind_cfg.data is None:
         raise typer.BadParameter(f"le kind '{kind}' n'a pas de bloc 'sheet'/'data'")
     rows = expand(load_rows(kind_cfg.data))
