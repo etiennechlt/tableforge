@@ -10,10 +10,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import jinja2
+
 from .catalog import (DEFAULT_MUSIC_LENGTH_MS, MUSIC_MAX_MS, MUSIC_MIN_MS,
                       SFX_MAX_S, SFX_MIN_S, catalog_entries, clamp_music_length_ms,
                       clamp_sfx_duration_s, get_entry, load_catalog, prompt_for_entry)
 from .config import KindConfig, ProjectConfig
+from .data import load_rows
 from .prompts import load_prompts, prompt_for, reference_data_urls
 from .providers.base import resolve_provider_name
 
@@ -201,8 +204,44 @@ def _tts_targets_from_catalog(project: ProjectConfig, kind_cfg: KindConfig,
     return tuple(targets)
 
 
+def _tts_targets_from_rows(project: ProjectConfig, kind_cfg: KindConfig,
+                           options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if kind_cfg.data is None:
+        raise ValueError(
+            f"le kind tts '{kind_cfg.name}' utilise generate.text mais n'a pas de data")
+    rows = load_rows(kind_cfg.data)
+    if ids:
+        wanted = set(ids)
+        missing = wanted - {row.id for row in rows}
+        if missing:
+            raise KeyError(
+                f"kind '{kind_cfg.name}' : id(s) inconnu(s) : {', '.join(sorted(missing))}")
+        rows = [row for row in rows if row.id in wanted]
+    template = jinja2.Template(str(options["text"]), undefined=jinja2.StrictUndefined)
+    voice_field = options.get("voice_field")
+    default_voice = options.get("voice")
+    targets: list[Target] = []
+    for row in rows:
+        try:
+            text = template.render(**row.data).strip()
+        except jinja2.exceptions.UndefinedError as exc:
+            raise ValueError(
+                f"kind '{kind_cfg.name}', id '{row.id}' : champ manquant dans le gabarit "
+                f"generate.text — {exc.message}") from exc
+        voice_name = (row.get(voice_field) if voice_field else None) or default_voice
+        if not voice_name:
+            raise ValueError(
+                f"kind '{kind_cfg.name}', id '{row.id}' : aucune voix — déclare "
+                "generate.voice ou generate.voice_field")
+        voice_id = _resolve_voice(str(voice_name), project.voices, kind=kind_cfg.name)
+        targets.append(Target(id=row.id, text=text, voice_id=voice_id))
+    return tuple(targets)
+
+
 def _tts_targets(project: ProjectConfig, kind_cfg: KindConfig,
                  options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if options.get("text") is not None:
+        return _tts_targets_from_rows(project, kind_cfg, options, ids)
     if kind_cfg.prompts is not None:
         return _tts_targets_from_catalog(project, kind_cfg, options, ids)
     raise ValueError(
