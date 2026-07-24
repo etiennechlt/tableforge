@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
 
+import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..config import KindConfig, ProjectConfig
@@ -211,13 +212,33 @@ def _voice_resolution_issues(project: ProjectConfig) -> list[str]:
             continue
         try:
             build_kind_spec(project, name)
-        except (KeyError, ValueError, FileNotFoundError) as exc:
+        except yaml.YAMLError as exc:
+            # yaml.safe_load ne renvoie ni nom de kind ni chemin — on les
+            # reconstruit ici. Le linter ne doit jamais planter sur un YAML
+            # syntaxiquement invalide (prompts/data), même hors try/except
+            # explicite de targets.py.
+            detail = str(exc).splitlines()[0] if str(exc) else exc.__class__.__name__
+            issues.append(f"kind '{name}' : fichier YAML invalide "
+                         f"({_source_path(kind_cfg)}) — {detail}")
+        except FileNotFoundError as exc:
+            # exc.args = (errno, strerror) : jamais une str exploitable telle
+            # quelle. exc.filename porte le chemin qui a manqué à l'open().
+            missing = exc.filename or _source_path(kind_cfg)
+            issues.append(f"kind '{name}' : fichier introuvable — {missing}")
+        except (KeyError, ValueError) as exc:
             # Les messages de targets.py incluent déjà "kind '<name>' : ..." —
             # même convention que le except ValueError plus haut : pas de
             # double préfixe.
             message = exc.args[0] if exc.args else str(exc)
             issues.append(message)
     return issues
+
+
+def _source_path(kind_cfg: KindConfig) -> Optional[Path]:
+    """Chemin déclaré (prompts ou data) d'un kind — pour un message d'erreur
+    quand l'exception elle-même ne le porte pas (ex. FileNotFoundError sans
+    .filename)."""
+    return kind_cfg.prompts or kind_cfg.data
 
 
 def _kind_issues(project: ProjectConfig, name: str, kind_cfg: KindConfig) -> list[str]:

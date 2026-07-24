@@ -55,3 +55,41 @@ def test_validate_accepts_known_voices(tmp_path):
     issues = validate_project(project)
 
     assert issues == []
+
+
+FORGE_SOLO_TTS = """
+project: demo
+providers:
+  eleven:
+    type: elevenlabs
+voices:
+  narrateur: id-narrateur
+kinds:
+  regles:
+    asset: tts
+    prompts: prompts/regles.yaml
+    generate: { with: eleven, voice: narrateur }
+"""
+
+
+def test_validate_reports_invalid_yaml_instead_of_crashing(tmp_path):
+    (tmp_path / "forge.yaml").write_text(FORGE_SOLO_TTS, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "regles.yaml").write_text(
+        "entries:\n  x: [unterminated flow\n", encoding="utf-8")
+    project = load_project(tmp_path)
+
+    issues = validate_project(project)  # ne doit pas lever yaml.YAMLError
+
+    assert any("regles" in issue and "YAML invalide" in issue for issue in issues)
+
+
+def test_validate_reports_missing_file_as_readable_string(tmp_path):
+    (tmp_path / "forge.yaml").write_text(FORGE_SOLO_TTS, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()  # prompts/regles.yaml jamais créé
+    project = load_project(tmp_path)
+
+    issues = validate_project(project)
+
+    assert all(isinstance(issue, str) for issue in issues)
+    assert any("regles" in issue and "regles.yaml" in issue for issue in issues)
