@@ -95,3 +95,16 @@ def ensure_provider(obj) -> Provider:
     if hasattr(obj, "plan") and hasattr(obj, "execute"):
         return obj
     return _LegacyAdapter(obj)
+
+
+def provider_for(project: ProjectConfig, kind_cfg: KindConfig) -> Provider:
+    name = resolve_provider_name(project, kind_cfg)
+    if name == "manual":
+        raise NotImplementedError(
+            "provider 'manual' : disponible en P1 (forge studio)")
+    cfg = project.providers[name]
+    if cfg.type == "seedream":
+        from .seedream import SeedreamProvider
+        return SeedreamProvider.from_provider_config(cfg)
+    raise NotImplementedError(
+        f"provider de type '{cfg.type}' : pas encore implémenté (phases P1+)")

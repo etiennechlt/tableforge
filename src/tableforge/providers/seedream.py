@@ -12,6 +12,8 @@ import httpx
 from dotenv import load_dotenv
 
 from ..config import ProviderConfig
+from ..paths import asset_path
+from .base import AssetJob
 
 DEFAULT_SEQUENTIAL = "auto"
 
@@ -55,15 +57,17 @@ def _save_image(item, dest: Path) -> Path:
 
 @dataclass(frozen=True)
 class SeedreamProvider:
-    api_key: str
+    api_key: Optional[str]
     base_url: str
     model: str
     default_size: str
     watermark: bool
     output_format: str
+    api_key_env: Optional[str] = None
 
     @classmethod
     def from_config(cls, cfg: ProviderConfig) -> "SeedreamProvider":
+        # v1 (compat tests) : résout la clé IMMÉDIATEMENT et échoue si absente.
         load_dotenv()
         key = os.environ.get(cfg.api_key_env)
         if not key:
@@ -71,7 +75,24 @@ class SeedreamProvider:
                 f"{cfg.api_key_env} manquant : copie .env.example vers .env et renseigne ta clé.")
         return cls(api_key=key, base_url=cfg.base_url, model=cfg.model,
                    default_size=cfg.default_size, watermark=cfg.watermark,
-                   output_format=cfg.output_format)
+                   output_format=cfg.output_format, api_key_env=cfg.api_key_env)
+
+    @classmethod
+    def from_provider_config(cls, cfg: ProviderConfig) -> "SeedreamProvider":
+        # v2 : keyless — la clé n'est lue qu'à execute() (_require_key).
+        return cls(api_key=None, base_url=cfg.base_url, model=cfg.model,
+                   default_size=cfg.default_size, watermark=cfg.watermark,
+                   output_format=cfg.output_format, api_key_env=cfg.api_key_env)
+
+    def _require_key(self) -> str:
+        if self.api_key:
+            return self.api_key
+        load_dotenv()
+        key = os.environ.get(self.api_key_env or "")
+        if not key:
+            raise RuntimeError(
+                f"{self.api_key_env} manquant : copie .env.example vers .env et renseigne ta clé.")
+        return key
 
     def build(self, prompt: str, size: Optional[str] = None,
               refs: Optional[list[str]] = None) -> dict:
@@ -81,9 +102,29 @@ class SeedreamProvider:
         req["prompt"] = prompt
         return req
 
+    def plan(self, spec) -> list[AssetJob]:
+        jobs = []
+        for target in spec.targets:
+            size = target.settings.get("size") or self.default_size
+            refs = list(target.refs)
+            request = summarize_request(self.build(target.text, size=size, refs=refs))
+            dest = asset_path(spec.root, spec.asset, spec.kind, target.id,
+                              self.output_format)
+            jobs.append(AssetJob(id=target.id, dest=dest, request=request,
+                                 payload={"prompt": target.text, "size": size,
+                                          "refs": refs},
+                                 notes=tuple(target.notes)))
+        return jobs
+
+    def execute(self, job: AssetJob) -> list[Path]:  # pragma: no cover — réseau
+        return self.generate(job.payload["prompt"], job.dest,
+                             size=job.payload.get("size"),
+                             refs=job.payload.get("refs") or None)
+
     def _client(self):  # pragma: no cover
         from openai import OpenAI
-        return OpenAI(api_key=self.api_key, base_url=self.base_url, max_retries=3, timeout=180.0)
+        return OpenAI(api_key=self._require_key(), base_url=self.base_url,
+                      max_retries=3, timeout=180.0)
 
     def generate(self, prompt: str, dest: Path, size: Optional[str] = None,
                  refs: Optional[list[str]] = None) -> list[Path]:  # pragma: no cover

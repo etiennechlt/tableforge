@@ -117,3 +117,61 @@ def test_asset_job_is_frozen():
     job = AssetJob(id="x", dest=Path("/tmp/x.png"), request={})
     with pytest.raises(Exception):
         job.id = "y"
+
+
+def test_from_provider_config_is_keyless(tmp_path, monkeypatch):
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    from tableforge.providers.seedream import SeedreamProvider
+    project = _project(tmp_path)
+    provider = SeedreamProvider.from_provider_config(project.providers["ark"])
+    assert provider.api_key is None
+    assert provider.api_key_env == "ARK_API_KEY"
+    assert provider.model == "seedream-5-0-260128"
+
+
+def test_require_key_reads_env_at_execute_time(tmp_path, monkeypatch):
+    from tableforge.providers.seedream import SeedreamProvider
+    project = _project(tmp_path)
+    provider = SeedreamProvider.from_provider_config(project.providers["ark"])
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="ARK_API_KEY"):
+        provider._require_key()
+    monkeypatch.setenv("ARK_API_KEY", "secret")
+    assert provider._require_key() == "secret"
+
+
+def test_seedream_plan_matches_build_summary(tmp_path, monkeypatch):
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    from tableforge.providers.seedream import (SeedreamProvider,
+                                               summarize_request)
+    project = _project(tmp_path)
+    provider = SeedreamProvider.from_provider_config(project.providers["ark"])
+    spec = SimpleNamespace(kind="cards", asset="image", root=Path("/proj"),
+                           output_format="png",
+                           targets=(SimpleNamespace(id="lame", text="A footman. Dark.",
+                                                    refs=("data:x",),
+                                                    settings={"size": "32x32"},
+                                                    notes=()),))
+    jobs = provider.plan(spec)
+    assert jobs[0].dest == Path("/proj/out/art/cards/lame.png")
+    assert jobs[0].request == summarize_request(
+        provider.build("A footman. Dark.", size="32x32", refs=["data:x"]))
+    assert jobs[0].payload == {"prompt": "A footman. Dark.", "size": "32x32",
+                               "refs": ["data:x"]}
+
+
+def test_provider_for_builds_keyless_seedream(tmp_path, monkeypatch):
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    from tableforge.providers.base import provider_for
+    project = _project(tmp_path)
+    provider = provider_for(project, project.kind("cards"))
+    assert provider.api_key is None and provider.api_key_env == "ARK_API_KEY"
+
+
+def test_provider_for_other_types_not_implemented_in_p0(tmp_path):
+    from tableforge.providers.base import provider_for
+    project = _project(tmp_path)
+    with pytest.raises(NotImplementedError):
+        provider_for(project, project.kind("nappes"))       # elevenlabs -> P1
+    with pytest.raises(NotImplementedError):
+        provider_for(project, project.kind("affiche"))      # manual -> P1
