@@ -11,7 +11,7 @@ from typing import Optional
 import httpx
 from dotenv import load_dotenv
 
-from .config import ProviderConfig
+from ..config import ProviderConfig
 
 DEFAULT_SEQUENTIAL = "auto"
 
