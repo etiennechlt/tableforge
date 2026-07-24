@@ -60,8 +60,8 @@ def resolve_provider_name(project: ProjectConfig, kind_cfg: KindConfig) -> str:
                 f"kind '{kind_cfg.name}' : le provider '{with_}' (type {provider_type}) "
                 f"ne sait pas générer l'asset '{asset}'")
         return with_
-    candidates = [name for name, cfg in project.providers.items()
-                  if asset in SUPPORTED_ASSETS[cfg.type]]
+    candidates = sorted(name for name, cfg in project.providers.items()
+                        if asset in SUPPORTED_ASSETS[cfg.type])
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:

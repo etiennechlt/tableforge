@@ -132,3 +132,9 @@ def test_unknown_provider_type_gets_french_error(tmp_path):
     text = NAMED.replace("type: elevenlabs", "type: bogus")
     with pytest.raises(ValueError, match="bogus"):
         load_project(_write(tmp_path, text))
+
+
+def test_provider_type_manual_rejected(tmp_path):
+    text = NAMED.replace("type: elevenlabs", "type: manual")
+    with pytest.raises(ValueError, match="réservé"):
+        load_project(_write(tmp_path, text))

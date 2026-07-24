@@ -1,8 +1,8 @@
 """Résolution des cibles d'un kind (pur, sans clé API ni réseau).
 
 `build_kind_spec` transforme la config + les fichiers data/prompts en un `KindSpec`
-immuable que les providers consomment (`plan`). P0 : asset image uniquement ;
-les branches music/sfx/tts/dialogue/video arrivent en P1/P2/P3.
+immuable que les providers consomment (`plan`). Assets image/music/sfx implémentés
+ici ; tts/dialogue arrivent en P2, video en P3.
 """
 from __future__ import annotations
 
@@ -60,7 +60,8 @@ def build_kind_spec(project: ProjectConfig, kind: str,
         output_format = getattr(provider_cfg, "output_format", None)
     else:
         raise NotImplementedError(
-            f"asset '{kind_cfg.asset}' : pas encore implémenté (phases P1+)")
+            f"asset '{kind_cfg.asset}' : pas encore implémenté "
+            "(tts/dialogue : P2 ; video : P3)")
     return KindSpec(kind=kind_cfg.name, asset=kind_cfg.asset,
                     provider_name=provider_name, options=options,
                     targets=tuple(targets), root=project.root,

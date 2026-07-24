@@ -90,13 +90,8 @@ class HiggsfieldProviderConfig(BaseModel):
     poll_timeout_s: float = 600.0
 
 
-class ManualProviderConfig(BaseModel):
-    type: Literal["manual"] = "manual"
-
-
 AnyProviderConfig = Annotated[
-    Union[SeedreamProviderConfig, ElevenLabsProviderConfig,
-          HiggsfieldProviderConfig, ManualProviderConfig],
+    Union[SeedreamProviderConfig, ElevenLabsProviderConfig, HiggsfieldProviderConfig],
     Field(discriminator="type"),
 ]
 
@@ -132,7 +127,7 @@ class ProjectConfig(BaseModel):
 
 
 _PATH_FIELDS = ("data", "prompts", "template")
-_PROVIDER_TYPES = ("seedream", "elevenlabs", "higgsfield", "manual")
+_PROVIDER_TYPES = ("seedream", "elevenlabs", "higgsfield")
 
 
 def _normalize_providers(raw: dict) -> dict[str, dict]:
@@ -158,6 +153,10 @@ def _normalize_providers(raw: dict) -> dict[str, dict]:
             raise ValueError(
                 f"provider '{name}' : champ 'type' requis "
                 f"({' | '.join(_PROVIDER_TYPES)})")
+        if block["type"] == "manual":
+            raise ValueError(
+                f"provider '{name}' : type 'manual' réservé — utilise "
+                "'generate: {with: manual}' sur le kind, sans déclarer de provider")
         if block["type"] not in _PROVIDER_TYPES:
             raise ValueError(
                 f"provider '{name}' : type '{block['type']}' inconnu "
