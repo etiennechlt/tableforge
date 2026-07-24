@@ -1,0 +1,8 @@
+entries:
+  intro:
+    lines:
+      - { voice: heraut, text: "La reine se meurt. Le trône appelle un nouveau sang." }
+      - { voice: vieille-reine, text: "Que les prétendants s'avancent, et que les cendres jugent." }
+  fin-de-partie:
+    lines:
+      - { voice: heraut, text: "Le décompte est fait. Une seule couronne demeure." }

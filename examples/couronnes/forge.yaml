@@ -11,6 +11,11 @@ providers:
   eleven:
     type: elevenlabs
 
+voices:                       # noms humains -> voice_id ElevenLabs (voix premade publiques)
+  narrateur:     JBFqnCBsd6RMkjVDRZzb
+  vieille-reine: EXAVITQu4vr4xnSDxMaL
+  heraut:        TxGEqnHWrfWFTfGW9XjX
+
 defaults:
   max_refs: 2
   ref_max_px: 1024
@@ -52,4 +57,21 @@ kinds:
   sfx:
     asset: sfx
     prompts: prompts/sfx.yaml
+    generate: { with: eleven }
+
+  narration:                  # lit chaque carte : gabarit Jinja sur les rows de cards
+    asset: tts
+    data: data/cards.yaml
+    generate:
+      with: eleven
+      voice: narrateur
+      text: "{{ name }}. {{ eff }}"
+      language: fr
+  voix-pnj:                   # une voix par personnage via voice_field
+    asset: tts
+    data: data/pnj.yaml
+    generate: { with: eleven, text: "{{ replique }}", voice_field: voice }
+  dialogues:                  # scènes multi-voix
+    asset: dialogue
+    prompts: prompts/dialogues.yaml
     generate: { with: eleven }

@@ -63,3 +63,48 @@ def test_example_validates_clean():
     from tableforge.providers.base import validate_project
     cfg = load_project(EXAMPLE)
     assert validate_project(cfg) == []
+
+
+def test_example_narration_reads_name_and_eff():
+    from tableforge.targets import build_kind_spec
+
+    cfg = load_project(EXAMPLE)
+
+    spec = build_kind_spec(cfg, "narration", ids=["lame"])
+
+    assert spec.asset == "tts"
+    target = spec.targets[0]
+    assert target.text == "Lame. Gagner 1 Fer."
+    assert target.voice_id == cfg.voices["narrateur"]
+
+
+def test_example_pnj_rows_pick_their_own_voice():
+    from tableforge.targets import build_kind_spec
+
+    cfg = load_project(EXAMPLE)
+
+    spec = build_kind_spec(cfg, "voix-pnj")
+
+    reine = next(t for t in spec.targets if t.id == "reine")
+    assert reine.voice_id == cfg.voices["vieille-reine"]
+    assert "cendres" in reine.text
+
+
+def test_example_dialogues_resolve_all_lines():
+    from tableforge.targets import build_kind_spec
+
+    cfg = load_project(EXAMPLE)
+
+    spec = build_kind_spec(cfg, "dialogues")
+
+    intro = next(t for t in spec.targets if t.id == "intro")
+    assert [line.voice_id for line in intro.lines] == [
+        cfg.voices["heraut"], cfg.voices["vieille-reine"]]
+
+
+def test_example_project_validates_clean():
+    from tableforge.providers.base import validate_project
+
+    cfg = load_project(EXAMPLE)
+
+    assert validate_project(cfg) == []

@@ -1,0 +1,3 @@
+rows:
+  - { id: reine, voice: vieille-reine, replique: "Les couronnes passent, les cendres restent." }
+  - { id: heraut, voice: heraut, replique: "Oyez ! Le conseil des guildes est ouvert." }
