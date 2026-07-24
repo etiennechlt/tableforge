@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+
+from pydantic import BaseModel, ConfigDict
 
 from ..config import KindConfig, ProjectConfig
 from ..paths import asset_path
@@ -41,27 +43,56 @@ class Provider(Protocol):
 
 
 def resolve_provider_name(project: ProjectConfig, kind_cfg: KindConfig) -> str:
-    explicit = kind_cfg.generate.with_ if kind_cfg.generate else None
-    if explicit is not None:
-        if explicit == "manual":
-            return "manual"
-        if explicit not in project.providers:
+    """Nom du provider d'un kind : `with:` explicite, `manual` réservé, sinon
+    auto-résolution si exactement un provider déclaré sait produire l'asset."""
+    asset = kind_cfg.asset
+    with_ = kind_cfg.generate.with_ if kind_cfg.generate else None
+    if with_ == "manual":
+        return "manual"
+    if with_ is not None:
+        if with_ not in project.providers:
+            declared = ", ".join(project.providers) or "aucun"
             raise ValueError(
-                f"kind '{kind_cfg.name}' : provider '{explicit}' inconnu "
-                f"(déclarés : {', '.join(project.providers) or 'aucun'})")
-        return explicit
-    candidates = sorted(name for name, cfg in project.providers.items()
-                        if kind_cfg.asset in SUPPORTED_ASSETS[cfg.type])
+                f"kind '{kind_cfg.name}' : provider '{with_}' inconnu (déclarés : {declared})")
+        provider_type = project.providers[with_].type
+        if asset not in SUPPORTED_ASSETS[provider_type]:
+            raise ValueError(
+                f"kind '{kind_cfg.name}' : le provider '{with_}' (type {provider_type}) "
+                f"ne sait pas générer l'asset '{asset}'")
+        return with_
+    candidates = [name for name, cfg in project.providers.items()
+                  if asset in SUPPORTED_ASSETS[cfg.type]]
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:
         raise ValueError(
-            f"kind '{kind_cfg.name}' : aucun provider déclaré ne sait produire "
-            f"l'asset '{kind_cfg.asset}' — ajoute un provider adapté ou "
-            "'generate: {with: manual}'")
+            f"kind '{kind_cfg.name}' : aucun provider déclaré ne sait générer "
+            f"l'asset '{asset}' — déclare-en un dans providers: ou utilise "
+            "generate: {with: manual}")
     raise ValueError(
-        f"kind '{kind_cfg.name}' : plusieurs providers possibles pour l'asset "
-        f"'{kind_cfg.asset}' ({', '.join(candidates)}) — précise 'generate: {{with: …}}'")
+        f"kind '{kind_cfg.name}' : plusieurs providers savent générer '{asset}' "
+        f"({', '.join(candidates)}) — précise generate: {{with: …}}")
+
+
+class MusicOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    length_ms: Optional[int] = None
+
+
+class SfxOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    duration_s: Optional[float] = None
+    loop: Optional[bool] = None
+
+
+_OPTION_MODELS: dict[tuple[str, str], type[BaseModel]] = {
+    ("elevenlabs", "music"): MusicOptions,
+    ("elevenlabs", "sfx"): SfxOptions,
+}
+
+
+def options_model(provider_type: str, asset: str) -> Optional[type[BaseModel]]:
+    return _OPTION_MODELS.get((provider_type, asset))
 
 
 class _LegacyAdapter:
