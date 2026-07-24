@@ -188,7 +188,7 @@ def _catalog_output_format(kind_cfg: KindConfig) -> Optional[str]:
 def _tts_targets_from_catalog(project: ProjectConfig, kind_cfg: KindConfig,
                               options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
     cfg = _load_kind_catalog(kind_cfg)
-    target_ids = ids or list(catalog_entries(cfg))
+    target_ids = _catalog_ids(cfg, ids)
     default_voice = options.get("voice")
     targets: list[Target] = []
     for entry_id in target_ids:
@@ -196,7 +196,8 @@ def _tts_targets_from_catalog(project: ProjectConfig, kind_cfg: KindConfig,
         text = entry.get("text") or entry.get("prompt")
         if not text:
             raise ValueError(
-                f"kind '{kind_cfg.name}', entrée '{entry_id}' : champ 'text' requis")
+                f"kind '{kind_cfg.name}', entrée '{entry_id}' : champ 'text' "
+                "(ou 'prompt', ou entrée chaîne) requis")
         voice_name = entry.get("voice") or default_voice
         if not voice_name:
             raise ValueError(
@@ -220,7 +221,11 @@ def _tts_targets_from_rows(project: ProjectConfig, kind_cfg: KindConfig,
             raise KeyError(
                 f"kind '{kind_cfg.name}' : id(s) inconnu(s) : {', '.join(sorted(missing))}")
         rows = [row for row in rows if row.id in wanted]
-    template = jinja2.Template(str(options["text"]), undefined=jinja2.StrictUndefined)
+    try:
+        template = jinja2.Template(str(options["text"]), undefined=jinja2.StrictUndefined)
+    except jinja2.TemplateSyntaxError as exc:
+        raise ValueError(
+            f"kind '{kind_cfg.name}' : gabarit generate.text invalide — {exc.message}") from exc
     voice_field = options.get("voice_field")
     default_voice = options.get("voice")
     targets: list[Target] = []
@@ -248,7 +253,7 @@ def _dialogue_targets(project: ProjectConfig, kind_cfg: KindConfig,
     if kind_cfg.prompts is None:
         raise ValueError(f"le kind dialogue '{kind_cfg.name}' n'a pas de fichier prompts")
     cfg = load_catalog(kind_cfg.prompts)
-    target_ids = ids or list(catalog_entries(cfg))
+    target_ids = _catalog_ids(cfg, ids)
     targets: list[Target] = []
     for entry_id in target_ids:
         entry = get_entry(cfg, entry_id)

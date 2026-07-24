@@ -50,6 +50,16 @@ def test_resolve_api_key_missing_raises_french_error(monkeypatch):
         resolve_api_key("ELEVENLABS_API_KEY")
 
 
+def test_resolve_api_key_missing_message_points_to_key_creation_url(monkeypatch):
+    # Aligné sur le message de ElevenLabsProvider._require_key (revue P2, item 3) :
+    # l'utilisateur doit savoir où créer la clé, pas seulement quelle variable manque.
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+
+    with pytest.raises(RuntimeError,
+                       match=r"https://elevenlabs\.io/app/settings/api-keys"):
+        resolve_api_key("ELEVENLABS_API_KEY")
+
+
 def test_format_voice_lines_marks_mapped_voices():
     voices = [{"voice_id": "id-abc", "name": "George"},
               {"voice_id": "id-zzz", "name": "Alice"}]
@@ -99,6 +109,38 @@ def test_cli_voices_list_without_api_key_shows_clean_error(tmp_path, monkeypatch
 
     assert res.exit_code != 0
     assert "ELEVENLABS_API_KEY" in res.output
+    assert "Traceback" not in res.output
+
+
+@respx.mock
+def test_cli_voices_list_401_shows_clean_error_with_hint(tmp_path, monkeypatch):
+    # raise_with_hint() lève un RuntimeError (pas une exception typer) pour toute
+    # réponse HTTP en erreur — jusqu'ici non attrapé par la CLI, ce qui laissait
+    # remonter une trace Python brute (revue P2, item 4).
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-bad")
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+    respx.get("https://api.elevenlabs.io/v1/voices").mock(
+        return_value=httpx.Response(401, json={"detail": "invalid_api_key"}))
+
+    res = runner.invoke(app, ["voices", "list", "--project", str(tmp_path)])
+
+    assert res.exit_code != 0
+    assert "clé refusée" in res.output
+    assert "Traceback" not in res.output
+
+
+@respx.mock
+def test_cli_voices_design_401_shows_clean_error_with_hint(tmp_path, monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-bad")
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+    respx.post("https://api.elevenlabs.io/v1/text-to-voice/design").mock(
+        return_value=httpx.Response(401, json={"detail": "invalid_api_key"}))
+
+    res = runner.invoke(app, ["voices", "design", "vieille reine rauque",
+                              "--project", str(tmp_path)])
+
+    assert res.exit_code != 0
+    assert "clé refusée" in res.output
     assert "Traceback" not in res.output
 
 

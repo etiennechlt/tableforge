@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 
+import httpx
 import typer
 
 from . import paths
@@ -34,7 +35,10 @@ def voices_list(project: Path = ProjectOpt):
         key = resolve_api_key(eleven.api_key_env)
     except RuntimeError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    lines = format_voice_lines(fetch_voices(eleven, key), cfg.voices)
+    try:
+        lines = format_voice_lines(fetch_voices(eleven, key), cfg.voices)
+    except (RuntimeError, httpx.HTTPError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     if not lines:
         typer.echo("aucune voix sur ce compte")
         return
@@ -62,7 +66,10 @@ def voices_design(description: str,
         key = resolve_api_key(eleven.api_key_env)
     except RuntimeError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    previews = design_previews(eleven, key, description)
+    try:
+        previews = design_previews(eleven, key, description)
+    except (RuntimeError, httpx.HTTPError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     if not previews:
         typer.echo("aucun aperçu renvoyé par l'API")
         raise typer.Exit(1)
@@ -71,8 +78,11 @@ def voices_design(description: str,
     if not save:
         typer.echo("relance avec --save --name NOM pour enregistrer la première voix")
         return
-    voice_id = save_voice(eleven, key, name=name, description=description,
-                          generated_voice_id=str(previews[0]["generated_voice_id"]))
+    try:
+        voice_id = save_voice(eleven, key, name=name, description=description,
+                              generated_voice_id=str(previews[0]["generated_voice_id"]))
+    except (RuntimeError, httpx.HTTPError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     typer.echo(f"voix enregistrée : {voice_id}")
     typer.echo("à coller dans forge.yaml :")
     typer.echo("voices:")

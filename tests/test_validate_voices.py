@@ -93,3 +93,49 @@ def test_validate_reports_missing_file_as_readable_string(tmp_path):
 
     assert all(isinstance(issue, str) for issue in issues)
     assert any("regles" in issue and "regles.yaml" in issue for issue in issues)
+
+
+FORGE_SOLO_TTS_TEXT = """
+project: demo
+providers:
+  eleven:
+    type: elevenlabs
+voices:
+  narrateur: id-narrateur
+kinds:
+  narration:
+    asset: tts
+    data: data/cards.yaml
+    generate: { with: eleven, voice: narrateur, text: "{{ name" }
+"""
+
+
+def test_validate_prefixes_catalog_without_entries_with_kind_name(tmp_path):
+    # catalog_entries() lève un KeyError « catalogue sans table 'entries:' » sans
+    # nom de kind — le linter doit le préfixer, sinon le message est illisible
+    # dans une liste de plusieurs kinds (revue P2, item 5).
+    (tmp_path / "forge.yaml").write_text(FORGE_SOLO_TTS, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "regles.yaml").write_text("direction: x\n", encoding="utf-8")
+    project = load_project(tmp_path)
+
+    issues = validate_project(project)
+
+    assert any(issue.startswith("kind 'regles' : ") and "entries:" in issue
+              for issue in issues)
+
+
+def test_validate_reports_invalid_jinja_template_instead_of_crashing(tmp_path):
+    # jinja2.Template(...) compile peut lever TemplateSyntaxError, pas ValueError —
+    # sans le garde-fou de targets.py, le linter (except (KeyError, ValueError))
+    # planterait au lieu de reporter un diagnostic (revue P2, item 1).
+    (tmp_path / "forge.yaml").write_text(FORGE_SOLO_TTS_TEXT, encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "cards.yaml").write_text(
+        'rows:\n  - { id: lame, name: "Lame" }\n', encoding="utf-8")
+    project = load_project(tmp_path)
+
+    issues = validate_project(project)  # ne doit pas lever TemplateSyntaxError
+
+    assert any("narration" in issue and "gabarit generate.text invalide" in issue
+              for issue in issues)

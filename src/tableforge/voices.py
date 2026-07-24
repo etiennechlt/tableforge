@@ -26,7 +26,8 @@ def resolve_api_key(env_name: str) -> str:
     key = os.environ.get(env_name)
     if not key:
         raise RuntimeError(
-            f"{env_name} manquant : copie .env.example vers .env et renseigne ta clé.")
+            f"{env_name} manquant : copie .env.example vers .env et renseigne "
+            "ta clé ElevenLabs (https://elevenlabs.io/app/settings/api-keys).")
     return key
 
 

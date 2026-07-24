@@ -96,6 +96,34 @@ def test_tts_catalog_output_format_flows_to_spec(tmp_path):
     assert spec.output_format == "mp3_22050_32"
 
 
+def test_tts_catalog_empty_ids_list_yields_no_targets(tmp_path):
+    # ids=[] est un filtre explicite « zéro cible », pas « pas de filtre » — aligné
+    # sur _catalog_ids comme les autres chemins catalogue (revue P2, item 2).
+    project = _project(tmp_path, {"prompts/regles.yaml": REGLES})
+
+    spec = build_kind_spec(project, "regles", ids=[])
+
+    assert spec.targets == ()
+
+
+def test_tts_catalog_unknown_id_raises(tmp_path):
+    project = _project(tmp_path, {"prompts/regles.yaml": REGLES})
+
+    with pytest.raises(KeyError, match="aucune entrée"):
+        build_kind_spec(project, "regles", ids=["absent"])
+
+
+def test_tts_catalog_entry_missing_text_mentions_alternatives(tmp_path):
+    catalog = 'entries:\n  x: { voice: narrateur }\n'
+    project = _project(tmp_path, {"prompts/regles.yaml": catalog})
+
+    with pytest.raises(ValueError, match="'text'") as excinfo:
+        build_kind_spec(project, "regles")
+
+    assert "prompt" in str(excinfo.value)
+    assert "entrée chaîne" in str(excinfo.value)
+
+
 def test_tts_unknown_voice_lists_declared_voices(tmp_path):
     catalog = 'entries:\n  x: { text: "Bonjour.", voice: fantome }\n'
     project = _project(tmp_path, {"prompts/regles.yaml": catalog})
@@ -157,6 +185,23 @@ def test_tts_rows_missing_template_field_raises_french_error(tmp_path):
         build_kind_spec(project, "narration")
 
     assert "lame" in str(excinfo.value)
+
+
+def test_tts_rows_invalid_jinja_template_raises_french_value_error(tmp_path):
+    # jinja2.Template(...) compile peut lever TemplateSyntaxError (pas ValueError) —
+    # sans ce garde-fou, `forge generate`/`forge list` plantent avec une trace
+    # anglaise au lieu d'un message français actionnable (revue P2, item 1).
+    forge_bad_template = FORGE.replace(
+        'text: "{{ name }}. {{ eff }}"', 'text: "{{ name"')
+    _write(tmp_path, "forge.yaml", forge_bad_template)
+    _write(tmp_path, "data/cards.yaml", CARDS)
+    project = load_project(tmp_path)
+
+    with pytest.raises(ValueError, match="gabarit generate.text invalide") as excinfo:
+        build_kind_spec(project, "narration")
+
+    assert "narration" in str(excinfo.value)
+    assert not isinstance(excinfo.value, KeyError)
 
 
 def test_tts_voice_field_beats_default_voice(tmp_path):
@@ -249,6 +294,23 @@ def test_dialogue_targets_resolve_lines_to_voice_ids(tmp_path):
     assert [line.voice_id for line in intro.lines] == ["id-heraut", "id-vieille-reine"]
     assert [line.text for line in intro.lines] == ["Oyez !", "Silence."]
     assert intro.text == "heraut: Oyez !\nvieille-reine: Silence."
+
+
+def test_dialogue_empty_ids_list_yields_no_targets(tmp_path):
+    # Même sémantique que les autres chemins catalogue : ids=[] = zéro cible,
+    # pas « pas de filtre » (revue P2, item 2).
+    project = _project(tmp_path, {"prompts/dialogues.yaml": DIALOGUES})
+
+    spec = build_kind_spec(project, "dialogues", ids=[])
+
+    assert spec.targets == ()
+
+
+def test_dialogue_unknown_id_raises(tmp_path):
+    project = _project(tmp_path, {"prompts/dialogues.yaml": DIALOGUES})
+
+    with pytest.raises(KeyError, match="aucune entrée"):
+        build_kind_spec(project, "dialogues", ids=["absent"])
 
 
 def test_dialogue_entry_without_lines_raises(tmp_path):

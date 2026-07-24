@@ -226,10 +226,13 @@ def _voice_resolution_issues(project: ProjectConfig) -> list[str]:
             missing = exc.filename or _source_path(kind_cfg)
             issues.append(f"kind '{name}' : fichier introuvable — {missing}")
         except (KeyError, ValueError) as exc:
-            # Les messages de targets.py incluent déjà "kind '<name>' : ..." —
-            # même convention que le except ValueError plus haut : pas de
-            # double préfixe.
+            # La plupart des messages de targets.py incluent déjà "kind '<name>' : ..."
+            # — on ne préfixe que ceux qui ne l'ont pas encore (ex. les KeyError bruts
+            # de catalog.py, qui n'ont pas connaissance du kind courant).
             message = exc.args[0] if exc.args else str(exc)
+            prefix = f"kind '{name}' : "
+            if not message.startswith(prefix):
+                message = f"{prefix}{message}"
             issues.append(message)
     return issues
 
