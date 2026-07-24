@@ -1,0 +1,13 @@
+# Catalogue SFX (ElevenLabs, POST /v1/sound-generation).
+# duration_s bornée 0.5..30 s ; loop: true = nappe/soundscape (30 s max).
+direction: >-
+  Short dry punchy board-game sound effect, tactile, clean, no music, no voice.
+output_format: mp3_44100_128
+entries:
+  pioche:
+    prompt: "A single quick paper card being drawn and sliding off a deck, crisp swish."
+    duration_s: 0.8
+  ambiance:
+    prompt: "Quiet tavern background, murmur and fireplace crackle, seamless."
+    duration_s: 30
+    loop: true

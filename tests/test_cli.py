@@ -88,3 +88,11 @@ def test_render_refuses_audio_kind(tmp_path):
     cfg = load_project(tmp_path)
     with pytest.raises(typer.BadParameter, match="rien à rendre"):
         _render_kind(cfg, "musiques", None)
+
+
+def test_starter_audio_dry_run(tmp_path):
+    runner.invoke(app, ["init", "g", "--dest", str(tmp_path)])
+    res = runner.invoke(app, ["generate", "musiques", "--project",
+                              str(tmp_path / "g"), "--dry-run"])
+    assert res.exit_code == 0, res.output
+    assert "menu" in res.output

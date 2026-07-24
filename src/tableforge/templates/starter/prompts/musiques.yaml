@@ -1,0 +1,18 @@
+# Catalogue MUSIC (ElevenLabs, POST /v1/music).
+# Schéma : direction (style commun), negative (replié dans le prompt),
+#          defaults.length_ms (bornes 3000..600000 ms), output_format, entries.
+direction: >-
+  Orchestral fantasy score, cinematic, restrained, seamless loopable bed.
+negative: >-
+  No lead vocals, no lyrics, no modern electronic instruments.
+defaults:
+  length_ms: 90000
+output_format: mp3_44100_128
+entries:
+  menu:
+    prompt: >-
+      Solemn main theme for a title screen, slow strings over a low drone.
+  victoire:
+    prompt: >-
+      Short victory sting, noble brass resolution, about eight seconds.
+    length_ms: 10000
