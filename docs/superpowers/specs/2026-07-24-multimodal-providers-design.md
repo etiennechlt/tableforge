@@ -157,9 +157,13 @@ kinds:
    l'auto-résolution) : `forge generate` refuse en pointant vers `forge studio` ;
    la fiche studio inclut `studio_url:` si présent.
 7. **`from:` sur un kind video** ⇒ i2v depuis `out/art/<from>/<id>.png` ; ids =
-   ceux du kind source (le catalogue de mouvement, s'il existe, doit être un
-   sous-ensemble — erreur nommant les deux fichiers sinon). Sans `from:` ⇒ t2v,
-   ids = entries du catalogue.
+   union de l'art déjà généré du kind source et des entrées du catalogue de
+   mouvement (s'il existe). Chaque entrée du catalogue est validée contre les
+   ids déclarés du kind source (`prompts:`/`data:`) ∪ l'art existant — erreur
+   nommant les deux fichiers si une entrée ne désigne aucune carte connue. Art
+   source manquant pour un id retenu : note au plan (dry-run/studio), erreur
+   bloquante à l'exécution seulement. Sans `from:` ⇒ t2v, ids = entries du
+   catalogue.
 
 ### 3.3 Catalogues non-image (fichiers `prompts:` des kinds audio/vidéo)
 
