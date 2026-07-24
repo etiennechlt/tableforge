@@ -19,11 +19,12 @@ NB (Step 0, P3a Task 2) — vérification doc API (docs.higgsfield.ai) :
 """
 from __future__ import annotations
 
+import copy
 import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import httpx
 import typer
@@ -50,12 +51,13 @@ def _auth_headers(api_key: str, api_secret: str) -> dict:
     return {"Authorization": f"Key {api_key}:{api_secret}"}
 
 
-def submit(cfg, req: dict, *, api_key: str, api_secret: str, kind: str = "video") -> str:
+def submit(cfg, req: dict, *, api_key: str, api_secret: str, kind: str = "video",
+          asset: str = "video") -> str:
     response = httpx.post(f"{cfg.base_url}{req['path']}", json=req["json"],
                           headers=_auth_headers(api_key, api_secret),
                           timeout=SUBMIT_TIMEOUT)
     if response.is_error:
-        raise_with_hint(response, provider_type="higgsfield", asset="video", kind=kind)
+        raise_with_hint(response, provider_type="higgsfield", asset=asset, kind=kind)
     request_id = response.json().get("request_id")
     if not request_id:
         raise RuntimeError(
@@ -67,7 +69,7 @@ def submit(cfg, req: dict, *, api_key: str, api_secret: str, kind: str = "video"
 def poll(cfg, request_id: str, *, api_key: str, api_secret: str,
          sleep: Callable[[float], None] = time.sleep,
          on_status: Optional[Callable[[str], None]] = None,
-         kind: str = "video") -> dict:
+         kind: str = "video", asset: str = "video") -> dict:
     status_url = f"{cfg.base_url}/requests/{request_id}/status"
     headers = _auth_headers(api_key, api_secret)
     elapsed = 0.0
@@ -75,7 +77,7 @@ def poll(cfg, request_id: str, *, api_key: str, api_secret: str,
     while True:
         response = httpx.get(status_url, headers=headers, timeout=SUBMIT_TIMEOUT)
         if response.is_error:
-            raise_with_hint(response, provider_type="higgsfield", asset="video", kind=kind)
+            raise_with_hint(response, provider_type="higgsfield", asset=asset, kind=kind)
         payload = response.json()
         status = str(payload.get("status", ""))
         if status != last_status:
@@ -182,17 +184,13 @@ class HiggsfieldProvider:
                    base_url=cfg.base_url, default_image_model=cfg.default_image_model,
                    poll_interval_s=cfg.poll_interval_s, poll_timeout_s=cfg.poll_timeout_s)
 
-    def plan(self, spec: KindSpec) -> list[AssetJob]:
-        if spec.asset != "video":
-            raise ValueError(
-                f"provider higgsfield : asset '{spec.asset}' non géré en P3a — seuls "
-                "les kinds video sont acceptés (l'image Higgsfield arrive en P3b).")
+    def _plan_video(self, spec: KindSpec) -> list[AssetJob]:
         options = HiggsfieldVideoOptions(**spec.options)
         jobs: list[AssetJob] = []
         for target in spec.targets:
             body = _video_body(target, options)
             summary_body = dict(body)
-            payload: dict = {"kind": spec.kind}
+            payload: dict = {"kind": spec.kind, "asset": "video"}
             if target.source_image is not None:
                 summary_body["image"] = f"[image source : {target.source_image}]"
                 if target.source_image.exists():
@@ -210,6 +208,34 @@ class HiggsfieldProvider:
                 notes=target.notes,
             ))
         return jobs
+
+    def _plan_image(self, spec: KindSpec) -> list[AssetJob]:
+        slug = spec.options.get("model") or self.default_image_model
+        jobs: list[AssetJob] = []
+        for target in spec.targets:
+            body = build_image_body(target.text, options=spec.options,
+                                    refs=target.refs)
+            payload = build_submit(slug, body)
+            payload["asset"] = "image"
+            request = copy.deepcopy(payload)
+            refs = request["json"].get(IMAGE_REF_FIELD)
+            if refs is not None:
+                request["json"][IMAGE_REF_FIELD] = (
+                    f"[{len(refs)} référence(s), data-URLs omises]")
+            dest = asset_path(spec.root, "image", spec.kind, target.id,
+                              spec.output_format or "png")
+            jobs.append(AssetJob(id=target.id, dest=dest, request=request,
+                                 payload=payload, notes=target.notes))
+        return jobs
+
+    def plan(self, spec: KindSpec) -> list[AssetJob]:
+        if spec.asset not in ("image", "video"):
+            raise ValueError(
+                f"provider higgsfield : asset '{spec.asset}' non géré — seuls "
+                "les kinds image et video sont acceptés.")
+        if spec.asset == "image":
+            return self._plan_image(spec)
+        return self._plan_video(spec)
 
     def _require_keys(self) -> tuple[str, str]:
         load_dotenv()
@@ -229,11 +255,12 @@ class HiggsfieldProvider:
             raise RuntimeError(missing_source)
         api_key, api_secret = self._require_keys()
         kind = str(job.payload.get("kind", "video"))
+        asset = str(job.payload.get("asset", "video"))
         request_id = submit(self, job.payload["submit"],
-                            api_key=api_key, api_secret=api_secret, kind=kind)
+                            api_key=api_key, api_secret=api_secret, kind=kind, asset=asset)
         typer.echo(f"  {job.id}: requête higgsfield {request_id}")
         payload = poll(self, request_id, api_key=api_key, api_secret=api_secret,
-                       sleep=self.sleep, kind=kind,
+                       sleep=self.sleep, kind=kind, asset=asset,
                        on_status=lambda status: typer.echo(f"  {job.id}: {status}"))
         url = _result_url(payload)
         response = httpx.get(url, timeout=DOWNLOAD_TIMEOUT)
@@ -241,3 +268,27 @@ class HiggsfieldProvider:
         job.dest.parent.mkdir(parents=True, exist_ok=True)
         job.dest.write_bytes(response.content)
         return [job.dest]
+
+
+# --- P3b : images (Soul / Seedream servis par Higgsfield) --------------------
+
+IMAGE_REF_FIELD = "image_refs"
+# NOTE contrat P3b : nom du champ des références i2i à VÉRIFIER contre
+# https://docs.higgsfield.ai (modèles Soul / bytedance-seedream) au moment de
+# l'implémentation — même réserve que le champ "image" (i2v) posé en P3a.
+# Si les docs diffèrent, ne changer QUE la valeur de cette constante.
+
+_IMAGE_OPTION_KEYS = ("aspect_ratio", "resolution", "style_id", "style_strength", "seed")
+
+
+def build_image_body(prompt: str, *, options: dict,
+                     refs: Sequence[str] = ()) -> dict:
+    """Corps JSON d'une génération d'image (options déjà validées, extra=forbid)."""
+    body: dict = {"prompt": prompt}
+    for key in _IMAGE_OPTION_KEYS:
+        value = options.get(key)
+        if value is not None:
+            body[key] = value
+    if refs:
+        body[IMAGE_REF_FIELD] = list(refs)
+    return body

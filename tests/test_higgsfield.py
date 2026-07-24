@@ -295,13 +295,13 @@ def test_plan_i2v_missing_art_defers_error_to_execute(tmp_path):
         provider.execute(job)
 
 
-def test_plan_rejects_non_video_asset(tmp_path):
-    # Arrange — l'image Higgsfield n'arrive qu'en P3b
+def test_plan_rejects_unsupported_asset(tmp_path):
+    # Arrange — image et video sont gérés (P3b) ; les autres assets ne le sont pas
     provider = HiggsfieldProvider.from_config(_cfg())
-    spec = replace(_spec(tmp_path, [Target(id="x", text="x")]), asset="image")
+    spec = replace(_spec(tmp_path, [Target(id="x", text="x")]), asset="music")
 
     # Act / Assert
-    with pytest.raises(ValueError, match="P3b"):
+    with pytest.raises(ValueError, match="non géré"):
         provider.plan(spec)
 
 
