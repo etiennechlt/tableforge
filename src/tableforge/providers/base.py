@@ -110,7 +110,16 @@ _OPTION_MODELS: dict[tuple[str, str], type[BaseModel]] = {
 
 
 def options_model(provider_type: str, asset: str) -> Optional[type[BaseModel]]:
-    return _OPTION_MODELS.get((provider_type, asset))
+    model = _OPTION_MODELS.get((provider_type, asset))
+    if model is not None:
+        return model
+    if provider_type == "higgsfield" and asset == "video":
+        # Import local : higgsfield.py importe déjà `from .base import AssetJob`,
+        # un import en tête de ce module créerait un cycle (même motif que les
+        # factories de _PROVIDER_FACTORIES plus bas).
+        from .higgsfield import HiggsfieldVideoOptions
+        return HiggsfieldVideoOptions
+    return None
 
 
 class _LegacyAdapter:
@@ -156,13 +165,22 @@ def _elevenlabs_provider(cfg) -> Provider:
     return ElevenLabsProvider.from_config(cfg)
 
 
+def _higgsfield_provider(cfg) -> Provider:
+    from .higgsfield import HiggsfieldProvider
+    return HiggsfieldProvider.from_config(cfg)
+
+
 # Registre {type de provider: factory}. Ajouter un provider = une entrée ici,
 # pas une branche if/elif de plus — chaque factory importe localement pour
 # éviter tout cycle d'import au chargement du package (providers/__init__.py
-# reste léger, sans import eager d'elevenlabs/manual/seedream).
+# reste léger, sans import eager d'elevenlabs/manual/seedream/higgsfield).
+# Couvre tous les types de `AnyProviderConfig` (config.py) : `cfg.type` est un
+# `Literal` validé par pydantic à la création du projet, donc `factory` est
+# garanti présent ici — pas de garde `None` à faire vivre en code mort.
 _PROVIDER_FACTORIES: dict[str, Callable[..., Provider]] = {
     "seedream": _seedream_provider,
     "elevenlabs": _elevenlabs_provider,
+    "higgsfield": _higgsfield_provider,
 }
 
 
@@ -176,12 +194,7 @@ def provider_for(project: ProjectConfig, kind_cfg: KindConfig) -> Provider:
         from .manual import ManualProvider
         return ManualProvider()
     cfg = project.providers[name]
-    factory = _PROVIDER_FACTORIES.get(cfg.type)
-    if factory is None:
-        raise ValueError(
-            f"provider '{name}' : type '{cfg.type}' pas encore pris en charge "
-            "pour la génération (higgsfield arrive en P3)")
-    return factory(cfg)
+    return _PROVIDER_FACTORIES[cfg.type](cfg)
 
 
 def validate_project(project: ProjectConfig) -> list[str]:
@@ -189,26 +202,31 @@ def validate_project(project: ProjectConfig) -> list[str]:
     issues: list[str] = []
     for name, kind_cfg in project.kinds.items():
         issues.extend(_kind_issues(project, name, kind_cfg))
-    issues.extend(_voice_resolution_issues(project))
-    # _kind_issues et _voice_resolution_issues rejouent toutes deux
+    issues.extend(_target_resolution_issues(project))
+    # _kind_issues et _target_resolution_issues rejouent toutes deux
     # resolve_provider_name (directement / via build_kind_spec) : un kind
-    # tts/dialogue avec un provider invalide produit le même message deux
-    # fois. dict.fromkeys préserve l'ordre et déduplique sans coupler les
-    # deux passes.
+    # tts/dialogue/video avec un provider invalide produit le même message
+    # deux fois. dict.fromkeys préserve l'ordre et déduplique sans coupler
+    # les deux passes.
     return list(dict.fromkeys(issues))
 
 
-def _voice_resolution_issues(project: ProjectConfig) -> list[str]:
-    """Détecte les voix inconnues où qu'elles soient déclarées (generate.voice,
-    entrée de catalogue, row via voice_field...) en rejouant build_kind_spec
-    pour chaque kind tts/dialogue — profite ainsi de toute la logique de
-    résolution des Tasks 2-4. Import local : targets importe providers.base
-    au chargement du module, un import en tête de fichier créerait un cycle."""
+def _target_resolution_issues(project: ProjectConfig) -> list[str]:
+    """Détecte les erreurs de résolution des cibles où qu'elles se nichent (voix
+    inconnue en generate.voice/catalogue/voice_field pour tts/dialogue, catalogue
+    de mouvement avec un id hors des cartes source pour un i2v vidéo, `from:`
+    vers un kind sans art...) en rejouant build_kind_spec pour chaque kind
+    tts/dialogue/video — profite ainsi de toute la logique de résolution des
+    Tasks 2-6. Élargi aux kinds video en P3a (watch-item de la revue P2) : sans
+    ça, une erreur de build_kind_spec propre à la vidéo (ex. entrée de catalogue
+    orpheline) ne remontait jamais dans `forge list`, seulement à l'exécution.
+    Import local : targets importe providers.base au chargement du module, un
+    import en tête de fichier créerait un cycle."""
     from ..targets import build_kind_spec
 
     issues: list[str] = []
     for name, kind_cfg in project.kinds.items():
-        if kind_cfg.asset not in ("tts", "dialogue"):
+        if kind_cfg.asset not in ("tts", "dialogue", "video"):
             continue
         try:
             build_kind_spec(project, name)
@@ -277,6 +295,12 @@ def _kind_issues(project: ProjectConfig, name: str, kind_cfg: KindConfig) -> lis
             model(**extras)
         except ValidationError:
             accepted = ", ".join(model.model_fields) or "aucune"
+            # Nomme la ou les clé(s) fautives quand la ValidationError vient d'une
+            # clé non reconnue (extra="forbid") — sans ça le message ne listait que
+            # les clés acceptées, jamais la clé effectivement rejetée (ex. 'fps').
+            unknown = sorted(set(extras) - set(model.model_fields))
+            detail = f" — clé(s) inconnue(s) : {', '.join(unknown)}" if unknown else ""
             issues.append(f"kind '{name}' : options generate: invalides pour "
-                          f"{provider_type}/{kind_cfg.asset} (clés acceptées : {accepted})")
+                          f"{provider_type}/{kind_cfg.asset}{detail} "
+                          f"(clés acceptées : {accepted})")
     return issues

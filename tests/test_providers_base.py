@@ -4,8 +4,10 @@ from types import SimpleNamespace
 import pytest
 
 from tableforge.config import load_project
-from tableforge.providers.base import (AssetJob, ensure_provider,
-                                       resolve_provider_name)
+from tableforge.providers.base import (AssetJob, SUPPORTED_ASSETS,
+                                       ensure_provider, options_model,
+                                       provider_for, resolve_provider_name,
+                                       validate_project)
 
 FORGE = """
 project: demo
@@ -162,7 +164,6 @@ def test_seedream_plan_matches_build_summary(tmp_path, monkeypatch):
 
 def test_provider_for_builds_keyless_seedream(tmp_path, monkeypatch):
     monkeypatch.delenv("ARK_API_KEY", raising=False)
-    from tableforge.providers.base import provider_for
     project = _project(tmp_path)
     provider = provider_for(project, project.kind("cards"))
     assert provider.api_key is None and provider.api_key_env == "ARK_API_KEY"
@@ -170,9 +171,8 @@ def test_provider_for_builds_keyless_seedream(tmp_path, monkeypatch):
 
 def test_provider_for_routes_elevenlabs_and_manual_in_p1(tmp_path):
     # P1 (task 9) : provider_for route désormais elevenlabs et manual au lieu de
-    # lever NotImplementedError (P0 stub). Higgsfield reste non pris en charge
-    # (ValueError, cf. tests/test_validate_project.py) jusqu'à P3.
-    from tableforge.providers.base import provider_for
+    # lever NotImplementedError (P0 stub). Higgsfield est branché en P3a (task 6,
+    # cf. test_provider_for_returns_higgsfield_provider plus bas).
     from tableforge.providers.elevenlabs import ElevenLabsProvider
     from tableforge.providers.manual import ManualProvider
     project = _project(tmp_path)
@@ -180,20 +180,128 @@ def test_provider_for_routes_elevenlabs_and_manual_in_p1(tmp_path):
     assert isinstance(provider_for(project, project.kind("affiche")), ManualProvider)
 
 
-def test_provider_for_raises_french_value_error_for_unimplemented_type(tmp_path):
-    # higgsfield est déclaré (SUPPORTED_ASSETS le sait produire) mais absent du
-    # registre _PROVIDER_FACTORIES : provider_for doit refuser explicitement
-    # (ValueError française), pas planter avec un KeyError silencieux.
-    from tableforge.providers.base import provider_for
-    forge = FORGE.replace(
-        "  eleven:\n    type: elevenlabs\n",
-        "  eleven:\n    type: elevenlabs\n  higgs:\n    type: higgsfield\n",
-    ) + """  poster:
-    asset: image
-    prompts: prompts/poster.yaml
-    generate: {with: higgs}
+# --- P3a Task 6 : branchement registre higgsfield (provider_for/options_model) --
+
+VIDEO_FORGE = """
+project: demo
+providers:
+  hf:
+    type: higgsfield
+kinds:
+  teaser:
+    asset: video
+    prompts: prompts/teaser.yaml
+    generate: {with: hf, model: kling-video/v2.1/standard/text-to-video}
 """
+
+VIDEO_CATALOG = """
+direction: "Cinematic."
+entries:
+  intro: {prompt: "A ruined throne room"}
+"""
+
+
+def _video_project(tmp_path, forge=VIDEO_FORGE):
     (tmp_path / "forge.yaml").write_text(forge, encoding="utf-8")
+    (tmp_path / "prompts").mkdir(exist_ok=True)
+    (tmp_path / "prompts" / "teaser.yaml").write_text(VIDEO_CATALOG, encoding="utf-8")
+    return load_project(tmp_path)
+
+
+def test_supported_assets_declare_higgsfield_video():
+    assert "video" in SUPPORTED_ASSETS["higgsfield"]
+
+
+def test_provider_for_returns_higgsfield_provider(tmp_path):
+    # Arrange
+    project = _video_project(tmp_path)
+
+    # Act
+    provider = provider_for(project, project.kind("teaser"))
+
+    # Assert
+    from tableforge.providers.higgsfield import HiggsfieldProvider
+    assert isinstance(provider, HiggsfieldProvider)
+    assert provider.base_url == "https://platform.higgsfield.ai"
+
+
+def test_options_model_higgsfield_video():
+    from tableforge.providers.higgsfield import HiggsfieldVideoOptions
+    assert options_model("higgsfield", "video") is HiggsfieldVideoOptions
+
+
+def test_validate_project_flags_unknown_video_option(tmp_path):
+    # Arrange — fps n'est pas une option (higgsfield, video)
+    forge = VIDEO_FORGE.replace(
+        "generate: {with: hf, model: kling-video/v2.1/standard/text-to-video}",
+        "generate: {with: hf, model: kling-video/v2.1/standard/text-to-video, fps: 24}")
+    project = _video_project(tmp_path, forge=forge)
+
+    # Act
+    issues = validate_project(project)
+
+    # Assert
+    assert any("fps" in issue for issue in issues)
+
+
+def test_validate_project_flags_from_to_unknown_kind(tmp_path):
+    # Arrange — from: vers un kind inexistant (contrôle posé en P1, verrouillé ici)
+    forge = VIDEO_FORGE.replace("    prompts: prompts/teaser.yaml\n",
+                                "    prompts: prompts/teaser.yaml\n    from: nope\n")
+    project = _video_project(tmp_path, forge=forge)
+
+    # Act
+    issues = validate_project(project)
+
+    # Assert
+    assert any("nope" in issue for issue in issues)
+
+
+# --- watch-item revue P2 : le replay du linter (ex-_voice_resolution_issues,
+# renommé _target_resolution_issues) doit couvrir les kinds video, pas
+# seulement tts/dialogue — sinon les erreurs de build_kind_spec propres à la
+# vidéo (catalogue de mouvement avec un id hors des cartes source) ne
+# remontent jamais dans `forge list`, seulement à l'exécution. -------------
+
+I2V_FORGE = """
+project: demo
+providers:
+  hf:
+    type: higgsfield
+kinds:
+  cartes:
+    prompts: prompts/cartes.yaml
+  cartes-animees:
+    asset: video
+    from: cartes
+    prompts: prompts/cartes-animees.yaml
+    generate: {with: hf, model: bytedance/seedance/v1/image-to-video}
+"""
+
+CARTES_PROMPTS = """
+art_direction: "Dark fantasy."
+prompts:
+  lame: "A footman."
+"""
+
+ORPHAN_MOTION_CATALOG = """
+direction: "Slow atmospheric motion."
+entries:
+  fantome: {prompt: "A ghost stirs"}
+"""
+
+
+def test_validate_project_surfaces_i2v_catalog_entry_outside_source_ids(tmp_path):
+    # Arrange
+    (tmp_path / "forge.yaml").write_text(I2V_FORGE, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "cartes.yaml").write_text(CARTES_PROMPTS, encoding="utf-8")
+    (tmp_path / "prompts" / "cartes-animees.yaml").write_text(ORPHAN_MOTION_CATALOG,
+                                                              encoding="utf-8")
     project = load_project(tmp_path)
-    with pytest.raises(ValueError, match="higgsfield arrive en P3"):
-        provider_for(project, project.kind("poster"))
+
+    # Act
+    issues = validate_project(project)
+
+    # Assert
+    assert any("fantome" in issue for issue in issues)
