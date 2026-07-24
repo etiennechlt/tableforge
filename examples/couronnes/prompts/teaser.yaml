@@ -1,0 +1,10 @@
+# Teaser t2v : une seule entrée, générée sans image source.
+direction: >-
+  Cinematic dark fantasy trailer shot, painterly gouache style in motion, volumetric
+  candle-gold light against deep cold shadow, drifting grey ash, film grain. No text,
+  no logo, no watermark.
+
+entries:
+  intro:
+    prompt: "A slow push-in on a ruined throne room, a blackened thorn crown levitating above the empty throne, ash rising into darkness"
+    duration_s: 8

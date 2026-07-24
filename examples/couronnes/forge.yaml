@@ -10,6 +10,8 @@ providers:
     watermark: false
   eleven:
     type: elevenlabs
+  higgsfield:
+    type: higgsfield
 
 voices:                       # noms humains -> voice_id ElevenLabs (voix premade publiques)
   narrateur:     JBFqnCBsd6RMkjVDRZzb
@@ -75,3 +77,17 @@ kinds:
     asset: dialogue
     prompts: prompts/dialogues.yaml
     generate: { with: eleven }
+
+  cartes-animees:
+    asset: video
+    from: cards
+    prompts: prompts/cartes-animees.yaml
+    generate: { with: higgsfield, model: bytedance/seedance/v1/image-to-video }
+
+  teaser:
+    asset: video
+    prompts: prompts/teaser.yaml
+    generate:
+      with: higgsfield
+      model: kling-video/v2.1/standard/text-to-video
+      aspect_ratio: "16:9"

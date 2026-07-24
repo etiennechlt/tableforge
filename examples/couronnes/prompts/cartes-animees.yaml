@@ -1,0 +1,17 @@
+# Catalogue de mouvement (i2v) : anime les illustrations de out/art/cards/<id>.png.
+# Les ids doivent exister dans prompts/cards.yaml (sous-ensemble strict).
+direction: >-
+  Subtle looping animation of the painted illustration: slow atmospheric motion,
+  drifting particles, flickering light. Keep the gouache texture and the exact
+  composition intact — no camera cuts, no new elements, seamless loop.
+
+defaults:
+  duration_s: 5
+
+entries:
+  lame:
+    prompt: "The footman's cloak and the forge glow ripple in a cold wind, embers drift upward"
+  couronne-maudite:
+    prompt: "The cursed crown pulses with violet ether flames, ash spirals slowly into darkness"
+  pacte-d-ether:
+    prompt: "The fractured ether crystal flickers violet-teal, glowing tendrils crawl along the arm"

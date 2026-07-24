@@ -100,3 +100,34 @@ def test_example_dialogues_resolve_all_lines():
     intro = next(t for t in spec.targets if t.id == "intro")
     assert [line.voice_id for line in intro.lines] == [
         cfg.voices["heraut"], cfg.voices["vieille-reine"]]
+
+
+def test_example_cartes_animees_dry_run_builds_i2v_requests():
+    # Arrange
+    cfg = load_project(EXAMPLE)
+
+    # Act — aucun art généré dans le dépôt : cibles = entrées du catalogue de mouvement
+    results = generate_kind(cfg, "cartes-animees", dry_run=True)
+
+    # Assert
+    assert {r.id for r in results} == {"lame", "couronne-maudite", "pacte-d-ether"}
+    lame = next(r for r in results if r.id == "lame")
+    assert lame.request["path"] == "/bytedance/seedance/v1/image-to-video"
+    assert lame.request["json"]["image"].startswith("[image source :")
+    assert "data:" not in str(lame.request)
+    assert all(r.dest is None for r in results)
+
+
+def test_example_teaser_dry_run_builds_t2v_request():
+    # Arrange
+    cfg = load_project(EXAMPLE)
+
+    # Act
+    results = generate_kind(cfg, "teaser", dry_run=True)
+
+    # Assert
+    assert [r.id for r in results] == ["intro"]
+    request = results[0].request
+    assert request["path"] == "/kling-video/v2.1/standard/text-to-video"
+    assert request["json"]["aspect_ratio"] == "16:9"
+    assert "image" not in request["json"]
