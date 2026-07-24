@@ -188,6 +188,35 @@ def validate_project(project: ProjectConfig) -> list[str]:
     issues: list[str] = []
     for name, kind_cfg in project.kinds.items():
         issues.extend(_kind_issues(project, name, kind_cfg))
+    issues.extend(_voice_resolution_issues(project))
+    # _kind_issues et _voice_resolution_issues rejouent toutes deux
+    # resolve_provider_name (directement / via build_kind_spec) : un kind
+    # tts/dialogue avec un provider invalide produit le même message deux
+    # fois. dict.fromkeys préserve l'ordre et déduplique sans coupler les
+    # deux passes.
+    return list(dict.fromkeys(issues))
+
+
+def _voice_resolution_issues(project: ProjectConfig) -> list[str]:
+    """Détecte les voix inconnues où qu'elles soient déclarées (generate.voice,
+    entrée de catalogue, row via voice_field...) en rejouant build_kind_spec
+    pour chaque kind tts/dialogue — profite ainsi de toute la logique de
+    résolution des Tasks 2-4. Import local : targets importe providers.base
+    au chargement du module, un import en tête de fichier créerait un cycle."""
+    from ..targets import build_kind_spec
+
+    issues: list[str] = []
+    for name, kind_cfg in project.kinds.items():
+        if kind_cfg.asset not in ("tts", "dialogue"):
+            continue
+        try:
+            build_kind_spec(project, name)
+        except (KeyError, ValueError, FileNotFoundError) as exc:
+            # Les messages de targets.py incluent déjà "kind '<name>' : ..." —
+            # même convention que le except ValueError plus haut : pas de
+            # double préfixe.
+            message = exc.args[0] if exc.args else str(exc)
+            issues.append(message)
     return issues
 
 
