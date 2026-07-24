@@ -222,6 +222,23 @@ def test_plan_t2v_builds_submit_jobs(tmp_path):
     assert job.payload["submit"]["json"] == job.request["json"]
 
 
+def test_plan_t2v_includes_resolution_when_set(tmp_path):
+    # Arrange — `resolution` (contrairement à `aspect_ratio`, déjà couvert par
+    # test_plan_t2v_builds_submit_jobs) n'était testé nulle part : verrou de la
+    # branche `if options.resolution:` de _video_body.
+    provider = HiggsfieldProvider.from_config(_cfg())
+    spec = _spec(tmp_path, [Target(id="intro", text="A ruined throne room")],
+                 options={"model": "kling-video/v2.1/standard/text-to-video",
+                          "resolution": "1080p"})
+
+    # Act
+    job = provider.plan(spec)[0]
+
+    # Assert
+    assert job.request["json"]["resolution"] == "1080p"
+    assert job.payload["submit"]["json"]["resolution"] == "1080p"
+
+
 def test_plan_kind_duration_is_fallback_only(tmp_path):
     # Arrange — duration_s au niveau kind, surchargée par les settings de la cible
     provider = HiggsfieldProvider.from_config(_cfg())

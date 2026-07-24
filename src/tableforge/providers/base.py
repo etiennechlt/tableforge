@@ -101,11 +101,27 @@ class ElevenLabsDialogueOptions(BaseModel):
     model: Optional[str] = None
 
 
+class HiggsfieldImageOptions(BaseModel):
+    """Options `generate:` d'un kind image servi par Higgsfield (contrat P3b).
+
+    `model` est optionnel ici (contrairement à `HiggsfieldVideoOptions`) : à
+    défaut, le provider retombe sur `cfg.default_image_model`.
+    """
+    model_config = ConfigDict(extra="forbid")
+    model: Optional[str] = None
+    aspect_ratio: Optional[str] = None
+    resolution: Optional[str] = None
+    style_id: Optional[str] = None
+    style_strength: Optional[float] = None
+    seed: Optional[int] = None
+
+
 _OPTION_MODELS: dict[tuple[str, str], type[BaseModel]] = {
     ("elevenlabs", "music"): MusicOptions,
     ("elevenlabs", "sfx"): SfxOptions,
     ("elevenlabs", "tts"): ElevenLabsTtsOptions,
     ("elevenlabs", "dialogue"): ElevenLabsDialogueOptions,
+    ("higgsfield", "image"): HiggsfieldImageOptions,
 }
 
 
