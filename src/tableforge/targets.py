@@ -368,18 +368,25 @@ def _i2v_targets(project: ProjectConfig, kind_cfg: KindConfig,
     targets: list[Target] = []
     for target_id in target_ids:
         source_image = asset_path(project.root, "image", source_name, target_id)
-        notes: tuple[str, ...] = ()
+        notes: list[str] = []
         if not source_image.exists():
-            notes = (f"art source manquant : {source_image} — lance d'abord "
-                     f"`forge generate {source_name}`",)
+            notes.append(f"art source manquant : {source_image} — lance d'abord "
+                        f"`forge generate {source_name}`")
         if target_id in known_entries:
             text = prompt_for_entry(target_id, catalog_cfg)
             settings = _video_settings(catalog_cfg, get_entry(catalog_cfg, target_id))
         else:
+            # Ni entrée catalogue ni `direction:` (contrairement à prompt_for_entry,
+            # ce texte-ci n'est pas glué à un séparateur) : "" est possible et
+            # partirait silencieusement vers le provider sans cette note.
             text = str(catalog_cfg.get("direction", "")).strip()
             settings = _video_settings(catalog_cfg, {})
+            if not text:
+                notes.append(
+                    "prompt vide (aucune entrée catalogue, aucune `direction:`) — "
+                    "renseigne l'une des deux")
         targets.append(Target(id=target_id, text=text, source_image=source_image,
-                              settings=settings, notes=notes))
+                              settings=settings, notes=tuple(notes)))
     return tuple(targets)
 
 

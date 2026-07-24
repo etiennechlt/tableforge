@@ -234,6 +234,28 @@ def test_i2v_missing_art_adds_warning_note(tmp_path):
     assert any("forge generate cards" in note for note in spec.targets[0].notes)
 
 
+MOTION_CATALOG_NO_DIRECTION = """
+entries:
+  lame: {prompt: "The cloak ripples in a cold wind"}
+"""
+
+
+def test_i2v_art_only_target_without_direction_notes_empty_prompt(tmp_path):
+    # Arrange — 'emissaire' a de l'art mais aucune entrée catalogue, et le
+    # catalogue n'a pas de 'direction:' : le prompt assemblé serait "" (aucun
+    # texte à envoyer au provider). Fold-in P3a (revue finale) : ça doit
+    # produire une note, pas un envoi silencieux de prompt vide.
+    project = _video_project(tmp_path, motion=MOTION_CATALOG_NO_DIRECTION)
+
+    # Act
+    spec = build_kind_spec(project, "cartes-animees")
+
+    # Assert
+    emissaire = next(t for t in spec.targets if t.id == "emissaire")
+    assert emissaire.text == ""
+    assert any("prompt vide" in note for note in emissaire.notes)
+
+
 def test_i2v_catalog_entry_outside_source_ids_raises_naming_both_files(tmp_path):
     # Arrange
     bad_catalog = MOTION_CATALOG + "  fantome: {prompt: \"ghost\"}\n"
