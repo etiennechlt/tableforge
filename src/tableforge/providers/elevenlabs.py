@@ -95,7 +95,7 @@ class ElevenLabsProvider:
     def plan(self, spec: "KindSpec") -> list[AssetJob]:
         if spec.asset not in ("music", "sfx", "tts", "dialogue"):
             raise NotImplementedError(
-                f"elevenlabs : asset '{spec.asset}' pas encore pris en charge (P2)")
+                f"elevenlabs : asset '{spec.asset}' pas encore pris en charge (video : P3)")
         output_format = spec.output_format or self.output_format
         jobs: list[AssetJob] = []
         for target in spec.targets:
