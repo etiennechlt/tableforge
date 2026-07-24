@@ -148,3 +148,30 @@ def test_all_without_kind_orders_audio_before_video_and_warns_missing_keys(tmp_p
     assert res.output.count("génération ignorée") == 2
     assert "(vent : génération ignorée : ELEVENLABS_API_KEY manquant" in res.output
     assert "(sort : génération ignorée : provider manuel" in res.output
+
+
+FORGE_ART_BRUT_CLI = """
+project: demo
+providers:
+  hf: {type: higgsfield}
+kinds:
+  art-brut:
+    asset: image
+    prompts: prompts/art.yaml
+    generate: {with: hf}
+"""
+
+
+def test_render_refuses_image_kind_without_template(tmp_path):
+    # Arrange
+    (tmp_path / "forge.yaml").write_text(FORGE_ART_BRUT_CLI, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "art.yaml").write_text(
+        'prompts:\n  lame: "A footman."\n', encoding="utf-8")
+
+    # Act
+    res = runner.invoke(app, ["render", "art-brut", "--project", str(tmp_path)])
+
+    # Assert
+    assert res.exit_code != 0
+    assert "art brut" in res.output

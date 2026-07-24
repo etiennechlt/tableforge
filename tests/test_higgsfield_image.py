@@ -7,7 +7,8 @@ import respx
 from pydantic import ValidationError
 
 from tableforge.config import HiggsfieldProviderConfig
-from tableforge.providers.base import SUPPORTED_ASSETS, options_model
+from tableforge.config import load_project
+from tableforge.providers.base import SUPPORTED_ASSETS, options_model, validate_project
 from tableforge.providers.higgsfield import (IMAGE_REF_FIELD, HiggsfieldProvider,
                                              build_image_body)
 from tableforge.targets import KindSpec, Target
@@ -161,3 +162,40 @@ def test_execute_image_job_reuses_submit_poll_download(tmp_path, monkeypatch):
     assert sent.headers["Authorization"] == "Key k:s"
     assert b'"prompt": "A footman. Dark fantasy."' in sent.content or \
            b'"prompt":"A footman. Dark fantasy."' in sent.content
+
+
+# --- P3b Task 4 : « art brut » légal (image sans template/render_size) ------
+
+FORGE_ART_BRUT = """
+project: demo
+providers:
+  hf: {type: higgsfield}
+kinds:
+  art-brut:
+    asset: image
+    prompts: prompts/art.yaml
+    generate: {with: hf, aspect_ratio: "3:4"}
+"""
+
+PROMPTS_ART_BRUT = """
+prompts:
+  lame: "A footman."
+"""
+
+
+def _art_brut_project(tmp_path):
+    (tmp_path / "forge.yaml").write_text(FORGE_ART_BRUT, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "art.yaml").write_text(PROMPTS_ART_BRUT, encoding="utf-8")
+    return load_project(tmp_path)
+
+
+def test_validate_project_accepts_image_kind_without_template(tmp_path):
+    # Arrange
+    project = _art_brut_project(tmp_path)
+
+    # Act
+    issues = validate_project(project)
+
+    # Assert
+    assert issues == []

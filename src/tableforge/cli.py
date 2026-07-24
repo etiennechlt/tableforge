@@ -168,9 +168,13 @@ def _render_kind(cfg, kind: str, only: Optional[List[str]]):
     from .render import render_png
     kind_cfg = cfg.kind(kind)
     _require_image_kind(kind_cfg, kind)
-    if kind_cfg.template is None or kind_cfg.render_size is None:
+    if kind_cfg.template is None:
         raise typer.BadParameter(
-            f"le kind '{kind}' n'a pas de template — rien à rendre")
+            f"le kind '{kind}' est de l'art brut (pas de template) — rien à rendre ; "
+            f"utilise `forge generate {kind}`")
+    if kind_cfg.render_size is None:
+        raise typer.BadParameter(
+            f"le kind '{kind}' n'a pas de render_size — rien à rendre")
     if kind_cfg.data is None:
         raise typer.BadParameter(f"le kind '{kind}' n'a pas de fichier data")
     rows = load_rows(kind_cfg.data)
