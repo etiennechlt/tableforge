@@ -96,3 +96,55 @@ def test_starter_audio_dry_run(tmp_path):
                               str(tmp_path / "g"), "--dry-run"])
     assert res.exit_code == 0, res.output
     assert "menu" in res.output
+
+
+FORGE_ALL_AUDIO_VIDEO = """
+project: demo-all
+providers:
+  eleven: { type: elevenlabs }
+kinds:
+  vent:
+    asset: sfx
+    prompts: prompts/vent.yaml
+    generate: { with: eleven }
+  sort:
+    asset: video
+    prompts: prompts/sort.yaml
+    generate: { with: manual }
+"""
+
+VENT_CATALOG = """
+direction: "Short dry wind gust, no music, no voice."
+entries:
+  rafale:
+    prompt: "A short gust of wind through dead leaves."
+    duration_s: 1.0
+"""
+
+SORT_CATALOG = """
+direction: "Slow arcane glow, cinematic."
+entries:
+  incantation:
+    prompt: "A slow arcane glyph ignites in the dark, embers rising."
+    duration_s: 5
+"""
+
+
+def test_all_without_kind_orders_audio_before_video_and_warns_missing_keys(tmp_path, monkeypatch):
+    """`forge all` sans kind : ordre audio → vidéo, clés/provider manquants en warnings
+    (pas d'échec) — seul test de bout en bout de l'orchestration run_all/_run_one_kind."""
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    (tmp_path / "forge.yaml").write_text(FORGE_ALL_AUDIO_VIDEO, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "vent.yaml").write_text(VENT_CATALOG, encoding="utf-8")
+    (tmp_path / "prompts" / "sort.yaml").write_text(SORT_CATALOG, encoding="utf-8")
+
+    res = runner.invoke(app, ["all", "--project", str(tmp_path)])
+
+    assert res.exit_code == 0, res.output
+    ordre_line = next(line for line in res.output.splitlines()
+                      if line.startswith("ordre : "))
+    assert ordre_line.index("vent") < ordre_line.index("sort")
+    assert res.output.count("génération ignorée") == 2
+    assert "(vent : génération ignorée : ELEVENLABS_API_KEY manquant" in res.output
+    assert "(sort : génération ignorée : provider manuel" in res.output
