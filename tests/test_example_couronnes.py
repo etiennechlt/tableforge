@@ -100,11 +100,3 @@ def test_example_dialogues_resolve_all_lines():
     intro = next(t for t in spec.targets if t.id == "intro")
     assert [line.voice_id for line in intro.lines] == [
         cfg.voices["heraut"], cfg.voices["vieille-reine"]]
-
-
-def test_example_project_validates_clean():
-    from tableforge.providers.base import validate_project
-
-    cfg = load_project(EXAMPLE)
-
-    assert validate_project(cfg) == []

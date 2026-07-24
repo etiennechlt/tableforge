@@ -193,6 +193,43 @@ def test_tts_rows_filter_by_ids(tmp_path):
     assert [t.id for t in spec.targets] == ["emissaire"]
 
 
+def test_tts_rows_empty_ids_list_yields_no_targets(tmp_path):
+    # ids=[] est un filtre explicite « zéro cible », pas « pas de filtre » — même
+    # sémantique que _catalog_ids (revue P2, item 2).
+    project = _project(tmp_path, {"data/cards.yaml": CARDS})
+
+    spec = build_kind_spec(project, "narration", ids=[])
+
+    assert spec.targets == ()
+
+
+def test_tts_rows_without_data_raises_french_error(tmp_path):
+    forge_text_no_data = FORGE.replace(
+        "  sans-source:\n    asset: tts\n    generate: { with: eleven, voice: narrateur }\n",
+        "  sans-source:\n    asset: tts\n    generate: { with: eleven, voice: narrateur, "
+        'text: "{{ x }}" }\n')
+    _write(tmp_path, "forge.yaml", forge_text_no_data)
+    project = load_project(tmp_path)
+
+    with pytest.raises(ValueError, match="data"):
+        build_kind_spec(project, "sans-source")
+
+
+def test_tts_rows_without_any_voice_raises_french_error(tmp_path):
+    forge_no_voice = FORGE.replace(
+        'generate: { with: eleven, voice: narrateur, text: "{{ name }}. {{ eff }}", '
+        "language: fr }\n  pnj",
+        'generate: { with: eleven, text: "{{ name }}. {{ eff }}", language: fr }\n  pnj')
+    _write(tmp_path, "forge.yaml", forge_no_voice)
+    _write(tmp_path, "data/cards.yaml", CARDS)
+    project = load_project(tmp_path)
+
+    with pytest.raises(ValueError, match="aucune voix") as excinfo:
+        build_kind_spec(project, "narration")
+
+    assert "voice_field" in str(excinfo.value)
+
+
 DIALOGUES = """
 entries:
   intro:

@@ -213,7 +213,7 @@ def _tts_targets_from_rows(project: ProjectConfig, kind_cfg: KindConfig,
         raise ValueError(
             f"le kind tts '{kind_cfg.name}' utilise generate.text mais n'a pas de data")
     rows = load_rows(kind_cfg.data)
-    if ids:
+    if ids is not None:
         wanted = set(ids)
         missing = wanted - {row.id for row in rows}
         if missing:

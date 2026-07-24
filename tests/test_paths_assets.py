@@ -19,6 +19,7 @@ def test_find_art_prefers_png_then_any_extension(tmp_path):
 def test_extension_for_image_defaults_to_png():
     assert extension_for("image", None) == ".png"
     assert extension_for("image", "webp") == ".webp"
+    assert extension_for("image", "jpeg") == ".jpeg"
 
 
 def test_extension_for_audio_follows_output_format_prefix():
@@ -27,6 +28,8 @@ def test_extension_for_audio_follows_output_format_prefix():
     assert extension_for("tts", "pcm_44100") == ".wav"
     assert extension_for("dialogue", "ulaw_8000") == ".wav"
     assert extension_for("music", None) == ".mp3"
+    assert extension_for("music", "alaw_8000") == ".wav"
+    assert extension_for("sfx", None) == ".mp3"
 
 
 def test_extension_for_video_is_mp4():

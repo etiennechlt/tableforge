@@ -33,8 +33,7 @@ def resolve_api_key(env_name: str) -> str:
 def fetch_voices(cfg: ElevenLabsProviderConfig, api_key: str) -> list[dict]:
     response = httpx.get(f"{cfg.base_url}/v1/voices",
                          headers={"xi-api-key": api_key}, timeout=DEFAULT_TIMEOUT)
-    if response.status_code >= 400:
-        raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
+    raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
     return list(response.json().get("voices", []))
 
 
@@ -48,8 +47,7 @@ def design_previews(cfg: ElevenLabsProviderConfig, api_key: str,
                           json={"voice_description": description,
                                 "auto_generate_text": True},
                           timeout=DEFAULT_TIMEOUT)
-    if response.status_code >= 400:
-        raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
+    raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
     return list(response.json().get("previews", []))
 
 
@@ -63,8 +61,7 @@ def save_voice(cfg: ElevenLabsProviderConfig, api_key: str, *, name: str,
                                 "voice_description": description,
                                 "generated_voice_id": generated_voice_id},
                           timeout=DEFAULT_TIMEOUT)
-    if response.status_code >= 400:
-        raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
+    raise_with_hint(response, provider_type="elevenlabs", asset="tts", kind="voices")
     return str(response.json()["voice_id"])
 
 
