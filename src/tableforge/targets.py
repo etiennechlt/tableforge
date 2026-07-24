@@ -1,8 +1,8 @@
 """Résolution des cibles d'un kind (pur, sans clé API ni réseau).
 
 `build_kind_spec` transforme la config + les fichiers data/prompts en un `KindSpec`
-immuable que les providers consomment (`plan`). Assets image/music/sfx/tts implémentés
-ici ; dialogue arrive en P2, video en P3.
+immuable que les providers consomment (`plan`). Les six assets (image, music, sfx,
+tts, dialogue, video) sont désormais tous implémentés ici.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .catalog import (DEFAULT_MUSIC_LENGTH_MS, MUSIC_MAX_MS, MUSIC_MIN_MS,
                       clamp_sfx_duration_s, get_entry, load_catalog, prompt_for_entry)
 from .config import KindConfig, ProjectConfig
 from .data import load_rows
+from .paths import asset_dir, asset_path
 from .prompts import load_prompts, prompt_for, reference_data_urls
 from .providers.base import resolve_provider_name
 
@@ -67,10 +68,9 @@ def build_kind_spec(project: ProjectConfig, kind: str,
     elif kind_cfg.asset == "dialogue":
         targets = _dialogue_targets(project, kind_cfg, options, ids)
         output_format = _catalog_output_format(kind_cfg)
-    else:
-        raise NotImplementedError(
-            f"asset '{kind_cfg.asset}' : pas encore implémenté "
-            "(dialogue : P2 ; video : P3)")
+    else:  # kind_cfg.asset == "video" — dernier littéral d'AssetType (config.py)
+        targets = _video_targets(project, kind_cfg, ids)
+        output_format = None
     return KindSpec(kind=kind_cfg.name, asset=kind_cfg.asset,
                     provider_name=provider_name, options=options,
                     targets=tuple(targets), root=project.root,
@@ -287,3 +287,104 @@ def _tts_targets(project: ProjectConfig, kind_cfg: KindConfig,
     raise ValueError(
         f"le kind tts '{kind_cfg.name}' : déclare generate.text + data, "
         "ou un fichier prompts (catalogue)")
+
+
+# --- P3a : cibles vidéo — i2v (depuis un kind image via `from:`) et t2v (catalogue) --
+
+def _filter_ids(kind_name: str, target_ids: list[str],
+                ids: Optional[list[str]]) -> list[str]:
+    """Filtre une liste de cibles déjà résolues (union art/catalogue pour i2v,
+    ids du catalogue pour t2v) par une liste d'ids explicite, en conservant l'ordre
+    canonique de `target_ids` (pas celui de `ids`). `ids=None` = pas de filtre ;
+    `ids=[]` = filtre explicite « zéro cible » — même sémantique que `_catalog_ids`
+    (utilisée par music/sfx/tts/dialogue) pour rester cohérent entre tous les assets."""
+    if ids is None:
+        return target_ids
+    unknown = sorted(set(ids) - set(target_ids))
+    if unknown:
+        raise KeyError(
+            f"id(s) inconnu(s) pour le kind '{kind_name}' : {', '.join(unknown)} "
+            f"(connus : {', '.join(target_ids)})")
+    wanted = set(ids)
+    return [target_id for target_id in target_ids if target_id in wanted]
+
+
+def _video_settings(cfg: dict, entry: dict) -> dict:
+    """Précédence entrée > `defaults:` du catalogue pour `duration_s` (le niveau
+    kind, lui, est géré par `options` côté provider — Task 4)."""
+    defaults = cfg.get("defaults") or {}
+    duration = _first_set(entry.get("duration_s"), defaults.get("duration_s"))
+    return {"duration_s": duration} if duration is not None else {}
+
+
+def _t2v_targets(kind_cfg: KindConfig, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if kind_cfg.prompts is None:
+        raise ValueError(
+            f"le kind '{kind_cfg.name}' (video t2v) requiert un fichier prompts "
+            "(catalogue d'entrées) — ou un `from:` pour animer un kind image (i2v)")
+    cfg = load_catalog(kind_cfg.prompts)
+    target_ids = _filter_ids(kind_cfg.name, list(catalog_entries(cfg)), ids)
+    return tuple(
+        Target(id=entry_id, text=prompt_for_entry(entry_id, cfg),
+              settings=_video_settings(cfg, get_entry(cfg, entry_id)))
+        for entry_id in target_ids)
+
+
+def _source_image_ids(source_kind: KindConfig) -> list[str]:
+    """Ids déclarés du kind image source (prompts ou data) — sert à valider qu'une
+    entrée du catalogue de mouvement désigne bien une carte connue, même si son art
+    n'a pas encore été généré (l'art manquant est une note, pas une erreur ici)."""
+    if source_kind.prompts is not None:
+        return list((load_prompts(source_kind.prompts).get("prompts") or {}).keys())
+    if source_kind.data is not None:
+        return [row.id for row in load_rows(source_kind.data)]
+    return []
+
+
+def _i2v_targets(project: ProjectConfig, kind_cfg: KindConfig,
+                 ids: Optional[list[str]]) -> tuple[Target, ...]:
+    source_name = kind_cfg.from_
+    source_kind = project.kind(source_name)
+    if source_kind.asset != "image":
+        raise ValueError(
+            f"le kind '{kind_cfg.name}' anime '{source_name}' qui n'est pas un kind "
+            f"image (asset : {source_kind.asset})")
+    art_ids = sorted(p.stem for p in
+                     asset_dir(project.root, "image", source_name).glob("*.png"))
+    catalog_cfg: dict = {}
+    entry_ids: list[str] = []
+    if kind_cfg.prompts is not None:
+        catalog_cfg = load_catalog(kind_cfg.prompts)
+        entry_ids = list(catalog_entries(catalog_cfg))
+        allowed = set(_source_image_ids(source_kind)) | set(art_ids)
+        unknown = sorted(set(entry_ids) - allowed)
+        if unknown:
+            source_file = source_kind.prompts or source_kind.data
+            raise ValueError(
+                f"catalogue de mouvement {kind_cfg.prompts} : entrées sans carte "
+                f"source ({', '.join(unknown)}) — ids attendus dans {source_file}")
+    target_ids = _filter_ids(kind_cfg.name, sorted(set(art_ids) | set(entry_ids)), ids)
+    known_entries = set(entry_ids)
+    targets: list[Target] = []
+    for target_id in target_ids:
+        source_image = asset_path(project.root, "image", source_name, target_id)
+        notes: tuple[str, ...] = ()
+        if not source_image.exists():
+            notes = (f"art source manquant : {source_image} — lance d'abord "
+                     f"`forge generate {source_name}`",)
+        if target_id in known_entries:
+            text = prompt_for_entry(target_id, catalog_cfg)
+            settings = _video_settings(catalog_cfg, get_entry(catalog_cfg, target_id))
+        else:
+            text = str(catalog_cfg.get("direction", "")).strip()
+            settings = _video_settings(catalog_cfg, {})
+        targets.append(Target(id=target_id, text=text, source_image=source_image,
+                              settings=settings, notes=notes))
+    return tuple(targets)
+
+
+def _video_targets(project: ProjectConfig, kind_cfg: KindConfig,
+                   ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if kind_cfg.from_ is not None:
+        return _i2v_targets(project, kind_cfg, ids)
+    return _t2v_targets(kind_cfg, ids)
