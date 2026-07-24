@@ -119,3 +119,16 @@ def test_generate_config_alias_and_extras():
     gc = GenerateConfig(**{"with": "ark", "voice": "narrateur"})
     assert gc.with_ == "ark"
     assert gc.extras() == {"voice": "narrateur"}
+
+
+def test_reserved_provider_names_rejected(tmp_path):
+    for reserved in ("manual", "default"):
+        text = NAMED.replace("  ark:", f"  {reserved}:", 1)
+        with pytest.raises(ValueError, match="réservé"):
+            load_project(_write(tmp_path, text))
+
+
+def test_unknown_provider_type_gets_french_error(tmp_path):
+    text = NAMED.replace("type: elevenlabs", "type: bogus")
+    with pytest.raises(ValueError, match="bogus"):
+        load_project(_write(tmp_path, text))

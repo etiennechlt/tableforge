@@ -17,6 +17,15 @@ def art_path(root: Path, kind: str, asset_id: str) -> Path:
     return art_dir(root, kind) / f"{asset_id}.png"
 
 
+def find_art(root: Path, kind: str, asset_id: str) -> Optional[Path]:
+    """Art d'un id, quelle que soit l'extension (.png prioritaire, sinon premier match)."""
+    exact = art_path(root, kind, asset_id)
+    if exact.exists():
+        return exact
+    candidates = sorted(art_dir(root, kind).glob(f"{asset_id}.*"))
+    return candidates[0] if candidates else None
+
+
 def render_path(root: Path, kind: str, asset_id: str) -> Path:
     return render_dir(root, kind) / f"{asset_id}.png"
 

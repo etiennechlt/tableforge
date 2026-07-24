@@ -68,9 +68,9 @@ def _render_kind(cfg, kind: str, only: Optional[List[str]]):
         rows = [r for r in rows if r.id in set(only)]
     out = []
     for row in rows:
-        art = paths.art_path(cfg.root, kind, row.id)
+        art = paths.find_art(cfg.root, kind, row.id)
         out_path = paths.render_path(cfg.root, kind, row.id)
-        render_png(cfg, kind_cfg, row, art if art.exists() else None, out_path)
+        render_png(cfg, kind_cfg, row, art, out_path)
         out.append(out_path)
         typer.echo(f"{row.id}: {out_path}")
     return out

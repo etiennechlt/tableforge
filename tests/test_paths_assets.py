@@ -5,6 +5,17 @@ from tableforge.paths import art_path, asset_dir, asset_path, extension_for
 ROOT = Path("/proj")
 
 
+def test_find_art_prefers_png_then_any_extension(tmp_path):
+    from tableforge.paths import art_dir, find_art
+    d = art_dir(tmp_path, "cards")
+    d.mkdir(parents=True)
+    assert find_art(tmp_path, "cards", "lame") is None
+    (d / "lame.jpeg").write_bytes(b"j")
+    assert find_art(tmp_path, "cards", "lame") == d / "lame.jpeg"
+    (d / "lame.png").write_bytes(b"p")
+    assert find_art(tmp_path, "cards", "lame") == d / "lame.png"
+
+
 def test_extension_for_image_defaults_to_png():
     assert extension_for("image", None) == ".png"
     assert extension_for("image", "webp") == ".webp"

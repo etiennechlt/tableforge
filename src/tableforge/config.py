@@ -148,10 +148,19 @@ def _normalize_providers(raw: dict) -> dict[str, dict]:
     if not providers:
         raise ValueError(
             "forge.yaml : déclare au moins un provider ('provider:' ou 'providers:')")
+    for name in ("manual", "default"):
+        if name in providers:
+            raise ValueError(
+                f"provider '{name}' : nom réservé — choisis un autre nom "
+                "(ex. 'ark', 'eleven', 'higgs')")
     for name, block in providers.items():
         if not isinstance(block, dict) or "type" not in block:
             raise ValueError(
                 f"provider '{name}' : champ 'type' requis "
+                f"({' | '.join(_PROVIDER_TYPES)})")
+        if block["type"] not in _PROVIDER_TYPES:
+            raise ValueError(
+                f"provider '{name}' : type '{block['type']}' inconnu "
                 f"({' | '.join(_PROVIDER_TYPES)})")
     return providers
 

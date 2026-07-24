@@ -109,7 +109,7 @@ class SeedreamProvider:
             refs = list(target.refs)
             request = summarize_request(self.build(target.text, size=size, refs=refs))
             dest = asset_path(spec.root, spec.asset, spec.kind, target.id,
-                              self.output_format)
+                              spec.output_format)
             jobs.append(AssetJob(id=target.id, dest=dest, request=request,
                                  payload={"prompt": target.text, "size": size,
                                           "refs": refs},
