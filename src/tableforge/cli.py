@@ -17,6 +17,27 @@ app = typer.Typer(add_completion=False,
 ProjectOpt = typer.Option(Path("."), "--project", "-p",
                           help="Dossier du projet (contient forge.yaml).")
 
+voices_app = typer.Typer(add_completion=False, help="Utilitaires de voix ElevenLabs.")
+app.add_typer(voices_app, name="voices")
+
+
+@voices_app.command("list")
+def voices_list(project: Path = ProjectOpt):
+    """Liste les voix du compte ElevenLabs et le mapping voices: du projet."""
+    from .voices import elevenlabs_config, fetch_voices, format_voice_lines, resolve_api_key
+    cfg = load_project(project)
+    try:
+        eleven = elevenlabs_config(cfg)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    key = resolve_api_key(eleven.api_key_env)
+    lines = format_voice_lines(fetch_voices(eleven, key), cfg.voices)
+    if not lines:
+        typer.echo("aucune voix sur ce compte")
+        return
+    for line in lines:
+        typer.echo(line)
+
 
 @app.command()
 def init(name: str, dest: Path = typer.Option(Path("."), "--dest", help="Dossier parent.")):
