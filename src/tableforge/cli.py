@@ -116,6 +116,8 @@ def generate(kind: str, project: Path = ProjectOpt,
     for res in results:
         where = "(dry-run)" if res.dest is None else str(res.dest)
         typer.echo(f"{res.id}: {where}")
+        for note in res.notes:
+            typer.echo(f"    note : {note}")
 
 
 @app.command()
