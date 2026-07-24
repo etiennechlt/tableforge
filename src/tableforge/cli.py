@@ -36,7 +36,8 @@ def list_kinds(project: Path = ProjectOpt):
             flags.append("data" if kind.data.exists() else "data?")
         if kind.prompts:
             flags.append("prompts" if kind.prompts.exists() else "prompts?")
-        flags.append("template" if kind.template.exists() else "template?")
+        if kind.template:
+            flags.append("template" if kind.template.exists() else "template?")
         sheet = " +sheet" if kind.sheet else ""
         typer.echo(f"- {name}: {', '.join(flags)}{sheet}")
 
@@ -57,6 +58,9 @@ def generate(kind: str, project: Path = ProjectOpt,
 def _render_kind(cfg, kind: str, only: Optional[List[str]]):
     from .render import render_png
     kind_cfg = cfg.kind(kind)
+    if kind_cfg.template is None or kind_cfg.render_size is None:
+        raise typer.BadParameter(
+            f"le kind '{kind}' n'a pas de template — rien à rendre")
     if kind_cfg.data is None:
         raise typer.BadParameter(f"le kind '{kind}' n'a pas de fichier data")
     rows = load_rows(kind_cfg.data)
