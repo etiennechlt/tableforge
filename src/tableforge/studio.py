@@ -14,6 +14,7 @@ STUDIO_URLS: dict[tuple[str, str], str] = {
     ("elevenlabs", "sfx"): "https://elevenlabs.io/app/sound-effects",
     ("elevenlabs", "tts"): "https://elevenlabs.io/app/speech-synthesis",
     ("elevenlabs", "dialogue"): "https://elevenlabs.io/app/speech-synthesis",
+    ("higgsfield", "video"): "https://higgsfield.ai/create/video",
 }
 
 

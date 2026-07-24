@@ -87,3 +87,45 @@ def test_studio_urls_table_covers_elevenlabs_assets():
     assert STUDIO_URLS[("elevenlabs", "sfx")] == "https://elevenlabs.io/app/sound-effects"
     assert STUDIO_URLS[("elevenlabs", "tts")] == "https://elevenlabs.io/app/speech-synthesis"
     assert STUDIO_URLS[("elevenlabs", "dialogue")] == "https://elevenlabs.io/app/speech-synthesis"
+
+
+VIDEO_FORGE = """
+project: demo
+providers:
+  hf:
+    type: higgsfield
+kinds:
+  teaser:
+    asset: video
+    prompts: prompts/teaser.yaml
+    generate: {with: hf, model: kling-video/v2.1/standard/text-to-video}
+"""
+
+VIDEO_CATALOG = """
+direction: "Cinematic."
+entries:
+  intro: {prompt: "A ruined throne room"}
+"""
+
+
+def test_studio_urls_include_higgsfield_video():
+    assert STUDIO_URLS[("higgsfield", "video")] == "https://higgsfield.ai/create/video"
+
+
+def test_studio_cards_for_t2v_kind_carry_url_and_dest(tmp_path):
+    # Arrange
+    (tmp_path / "forge.yaml").write_text(VIDEO_FORGE, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "teaser.yaml").write_text(VIDEO_CATALOG, encoding="utf-8")
+    project = load_project(tmp_path)
+
+    # Act
+    cards = studio_cards(project, "teaser")
+
+    # Assert
+    assert len(cards) == 1
+    card = cards[0]
+    assert card.id == "intro"
+    assert card.url == "https://higgsfield.ai/create/video"
+    assert card.dest == tmp_path / "out" / "video" / "teaser" / "intro.mp4"
+    assert "A ruined throne room" in card.text
