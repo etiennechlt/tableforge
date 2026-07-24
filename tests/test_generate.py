@@ -75,3 +75,49 @@ def test_skips_existing_art_without_force(tmp_path):
 
     results = generate_kind(project, "cards", ids=["lame"], provider=FakeProvider())
     assert results[0].request == {"skipped": "exists"}
+
+
+FORGE_MULTIMODAL = """
+project: demo
+providers:
+  ark:
+    type: seedream
+    base_url: https://ark.x/api/v3
+    api_key_env: ARK_API_KEY
+    model: seedream-5-0-260128
+  eleven:
+    type: elevenlabs
+  hf:
+    type: higgsfield
+kinds:
+  teaser:
+    asset: video
+    prompts: prompts/teaser.yaml
+    generate: {with: hf, model: kling-video/v2.1/standard/text-to-video}
+  nappes:
+    asset: sfx
+    prompts: prompts/nappes.yaml
+    generate: {with: eleven}
+  cards:
+    prompts: prompts/cards.yaml
+    template: templates/card
+    render_size: {width: 10, height: 10}
+    generate: {with: ark}
+  board:
+    data: data/board.yaml
+    template: templates/board
+    render_size: {width: 10, height: 10}
+"""
+
+
+def test_kinds_in_order_image_then_audio_then_video(tmp_path):
+    # Arrange — déclaration volontairement dans le désordre (video, audio, image, image)
+    (tmp_path / "forge.yaml").write_text(FORGE_MULTIMODAL, encoding="utf-8")
+    from tableforge.generate import kinds_in_order
+    project = load_project(tmp_path)
+
+    # Act
+    order = kinds_in_order(project)
+
+    # Assert — image d'abord (ordre de déclaration conservé), puis audio, puis vidéo
+    assert order == ["cards", "board", "nappes", "teaser"]

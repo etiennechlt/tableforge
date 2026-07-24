@@ -220,13 +220,28 @@ def sheet(kind: str, project: Path = ProjectOpt):
 
 
 @app.command("all")
-def run_all(kind: str, project: Path = ProjectOpt):
-    """generate (si clé) → render → sheet."""
+def run_all(kind: Optional[str] = typer.Argument(None, help="Un kind, ou rien pour tout le projet."),
+            project: Path = ProjectOpt):
+    """generate (si clé) → render → sheet ; sans kind : tout, ordre image → audio → vidéo."""
+    from .generate import kinds_in_order
     cfg = load_project(project)
-    try:
-        generate_kind(cfg, kind)
-    except RuntimeError as exc:
-        typer.echo(f"(génération ignorée : {exc})")
-    _render_kind(cfg, kind, None)
-    if cfg.kind(kind).sheet:
-        sheet(kind, project)
+    names = [kind] if kind else kinds_in_order(cfg)
+    if kind is None:
+        typer.echo("ordre : " + " → ".join(names))
+    for name in names:
+        _run_one_kind(cfg, name, project)
+
+
+def _run_one_kind(cfg, name: str, project: Path) -> None:
+    kind_cfg = cfg.kind(name)
+    if kind_cfg.prompts is not None or kind_cfg.generate is not None:
+        try:
+            generate_kind(cfg, name)
+        except RuntimeError as exc:
+            typer.echo(f"({name} : génération ignorée : {exc})")
+    if kind_cfg.asset != "image":
+        return
+    if kind_cfg.data is not None and kind_cfg.template is not None:
+        _render_kind(cfg, name, None)
+    if kind_cfg.sheet:
+        sheet(name, project)
