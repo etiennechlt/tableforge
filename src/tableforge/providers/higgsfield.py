@@ -52,6 +52,14 @@ def _auth_headers(api_key: str, api_secret: str) -> dict:
     return {"Authorization": f"Key {api_key}:{api_secret}"}
 
 
+def _missing_source_note(notes: tuple[str, ...]) -> Optional[str]:
+    """Retrouve, parmi les notes de la cible, celle posée par
+    `_i2v_targets` (targets.py) quand l'art source manque — elle nomme déjà le kind
+    source (`forge generate <kind>`). Réutilisée telle quelle comme message d'erreur
+    d'`execute()` (P3a final review #5) : dry-run et exécution disent la même chose."""
+    return next((note for note in notes if note.startswith("art source manquant")), None)
+
+
 def submit(cfg, req: dict, *, api_key: str, api_secret: str, kind: str = "video",
           asset: str = "video") -> str:
     response = httpx.post(f"{cfg.base_url}{req['path']}", json=req["json"],
@@ -255,7 +263,7 @@ class HiggsfieldProvider:
                 if target.source_image.exists():
                     body = {**body, "image": encode_image_data_url(target.source_image)}
                 else:
-                    missing_source = (
+                    missing_source = _missing_source_note(target.notes) or (
                         f"art source manquant : {target.source_image} — génère d'abord "
                         "l'art du kind source (forge generate).")
             payload = build_submit(options.model, body)

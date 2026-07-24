@@ -356,7 +356,9 @@ def test_plan_i2v_missing_art_defers_error_to_execute(tmp_path):
     assert "image" not in job.payload["json"]
     assert job.request["json"]["image"] == f"[image source : {art}]"
     assert note in job.notes
-    with pytest.raises(RuntimeError, match="art source manquant"):
+    # Unification (P3a final review #5) : l'erreur d'execute() reprend le texte EXACT
+    # de la note du dry-run (nomme le kind source), au lieu d'un message générique.
+    with pytest.raises(RuntimeError, match=r"lance d'abord `forge generate cards`"):
         provider.execute(job)
 
 
