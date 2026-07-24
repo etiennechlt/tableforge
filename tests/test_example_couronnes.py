@@ -131,3 +131,20 @@ def test_example_teaser_dry_run_builds_t2v_request():
     assert request["path"] == "/kling-video/v2.1/standard/text-to-video"
     assert request["json"]["aspect_ratio"] == "16:9"
     assert "image" not in request["json"]
+
+
+def test_example_cards_soul_dry_run_targets_higgsfield_soul():
+    # Arrange
+    cfg = load_project(EXAMPLE)
+
+    # Act
+    results = generate_kind(cfg, "cards-soul", dry_run=True)
+
+    # Assert
+    assert sorted(r.id for r in results) == ["couronne-maudite", "emissaire", "lame"]
+    lame = next(r for r in results if r.id == "lame")
+    assert lame.request["path"] == "/higgsfield-ai/soul/standard"
+    assert "footman" in lame.request["json"]["prompt"]
+    assert lame.request["json"]["aspect_ratio"] == "3:4"
+    assert "data:image" not in str(lame.request)
+    assert all(r.dest is None for r in results)

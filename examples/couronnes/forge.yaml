@@ -78,6 +78,11 @@ kinds:
     prompts: prompts/dialogues.yaml
     generate: { with: eleven }
 
+  cards-soul:                 # variante d'art via Higgsfield Soul — art brut (pas de template)
+    asset: image
+    prompts: prompts/cards-soul.yaml
+    generate: { with: higgsfield, aspect_ratio: "3:4" }
+
   cartes-animees:
     asset: video
     from: cards

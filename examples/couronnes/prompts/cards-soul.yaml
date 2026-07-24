@@ -1,0 +1,17 @@
+# Variante d'art « Soul » (Higgsfield) — 3 cartes témoins, art brut (pas de template).
+art_direction: >-
+  Painterly dark medieval fantasy portrait, cinematic chiaroscuro with one warm
+  candle-gold key light against deep cold shadow, muted grim palette, aged
+  illuminated manuscript texture. No text, no border — illustration only.
+
+negative: >-
+  Avoid: any text, letters, watermark, card frame or border, bright cheerful colors,
+  photographic realism.
+
+style_refs:
+  - reference/02-Lame.png
+
+prompts:
+  lame: "A weary low-ranking footman in a patched gambeson gripping a nicked iron sword point-down in a muddy barracks yard."
+  emissaire: "A hooded emissary in a dust-worn traveling cloak holding out a sealed letter with a red wax seal."
+  couronne-maudite: "A blackened thorn-wrought crown levitating above an empty throne, wreathed in cold violet ether flames."
