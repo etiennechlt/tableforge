@@ -121,6 +121,23 @@ def list_kinds(project: Path = ProjectOpt):
         raise typer.Exit(code=1)
 
 
+def _dry_run_auth_note(cfg, kind: str) -> str:
+    """Une ligne française nommant la/les variable(s) d'env qu'un vrai lancement
+    lira — jamais la clé elle-même. `manual` n'a pas d'auth : pointe vers
+    `forge studio` (le seul vrai chemin pour ce kind)."""
+    from .providers.base import resolve_provider_name
+    kind_cfg = cfg.kind(kind)
+    provider_name = resolve_provider_name(cfg, kind_cfg)
+    if provider_name == "manual":
+        return f"note d'auth : provider manuel — le vrai chemin est `forge studio {kind}`"
+    provider_cfg = cfg.providers[provider_name]
+    env_vars = [provider_cfg.api_key_env]
+    secret_env = getattr(provider_cfg, "api_secret_env", None)
+    if secret_env:
+        env_vars.append(secret_env)
+    return f"note d'auth : un vrai lancement lira {', '.join(env_vars)}"
+
+
 @app.command()
 def generate(kind: str, project: Path = ProjectOpt,
              id: Optional[List[str]] = typer.Option(None, "--id", help="Limiter à ces ids."),
@@ -134,6 +151,8 @@ def generate(kind: str, project: Path = ProjectOpt,
         typer.echo(f"{res.id}: {where}")
         for note in res.notes:
             typer.echo(f"    note : {note}")
+    if dry_run and results:
+        typer.echo(_dry_run_auth_note(cfg, kind))
 
 
 @app.command()

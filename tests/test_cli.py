@@ -175,3 +175,34 @@ def test_render_refuses_image_kind_without_template(tmp_path):
     # Assert
     assert res.exit_code != 0
     assert "art brut" in res.output
+
+
+# --- Revue finale de branche : note d'auth en dry-run (item 1) --------------
+
+def test_dry_run_prints_auth_note_naming_env_var(tmp_path):
+    # Arrange — kind 'musiques' via le provider nommé 'eleven' (elevenlabs)
+    _audio_project(tmp_path)
+
+    # Act
+    res = runner.invoke(app, ["generate", "musiques", "--project", str(tmp_path), "--dry-run"])
+
+    # Assert
+    assert res.exit_code == 0, res.output
+    assert "note d'auth" in res.output
+    assert "ELEVENLABS_API_KEY" in res.output
+
+
+def test_dry_run_prints_manual_note_pointing_to_studio(tmp_path):
+    # Arrange — kind 'sort' (video) via generate: {with: manual}
+    (tmp_path / "forge.yaml").write_text(FORGE_ALL_AUDIO_VIDEO, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "vent.yaml").write_text(VENT_CATALOG, encoding="utf-8")
+    (tmp_path / "prompts" / "sort.yaml").write_text(SORT_CATALOG, encoding="utf-8")
+
+    # Act
+    res = runner.invoke(app, ["generate", "sort", "--project", str(tmp_path), "--dry-run"])
+
+    # Assert
+    assert res.exit_code == 0, res.output
+    assert "note d'auth" in res.output
+    assert "forge studio sort" in res.output

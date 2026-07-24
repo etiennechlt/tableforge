@@ -281,3 +281,88 @@ def test_i2v_filters_ids_and_rejects_unknown(tmp_path):
     assert [t.id for t in spec.targets] == ["lame"]
     with pytest.raises(KeyError, match="inconnu"):
         build_kind_spec(project, "cartes-animees", ids=["nope"])
+
+
+# --- Revue finale de branche (item 2) : validation unifiée des options au
+# plan (build_kind_spec), pas seulement au linter (forge list) --------------
+
+FORGE_OPTION_VALIDATION = """
+project: demo
+providers:
+  eleven:
+    type: elevenlabs
+  hf:
+    type: higgsfield
+kinds:
+  musiques:
+    asset: music
+    prompts: prompts/musiques.yaml
+    generate: {with: eleven, langue: fr}
+  teaser:
+    asset: video
+    prompts: prompts/teaser.yaml
+    generate: {with: hf, model: kling-video/v2.1/standard/text-to-video, fps: 24}
+"""
+
+MUSIQUES_CATALOG_SIMPLE = """
+direction: "Epic score."
+entries:
+  menu: {prompt: "Main theme"}
+"""
+
+TEASER_CATALOG_SIMPLE = """
+direction: "Cinematic."
+entries:
+  intro: {prompt: "A ruined throne room"}
+"""
+
+
+def _option_validation_project(tmp_path):
+    (tmp_path / "forge.yaml").write_text(FORGE_OPTION_VALIDATION, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "musiques.yaml").write_text(MUSIQUES_CATALOG_SIMPLE,
+                                                        encoding="utf-8")
+    (tmp_path / "prompts" / "teaser.yaml").write_text(TEASER_CATALOG_SIMPLE, encoding="utf-8")
+    return load_project(tmp_path)
+
+
+def test_unknown_option_on_elevenlabs_music_kind_raises_french_value_error(tmp_path):
+    # Arrange
+    project = _option_validation_project(tmp_path)
+
+    # Act / Assert
+    with pytest.raises(ValueError) as excinfo:
+        build_kind_spec(project, "musiques")
+    message = str(excinfo.value)
+    assert "musiques" in message
+    assert "langue" in message
+    assert "clés acceptées" in message
+
+
+def test_unknown_option_on_higgsfield_video_kind_raises_french_value_error(tmp_path):
+    # Arrange — même chemin français que ci-dessus (au lieu du traceback pydantic
+    # anglais que levait jusqu'ici HiggsfieldProvider._plan_video)
+    project = _option_validation_project(tmp_path)
+
+    # Act / Assert
+    with pytest.raises(ValueError) as excinfo:
+        build_kind_spec(project, "teaser")
+    message = str(excinfo.value)
+    assert "teaser" in message
+    assert "fps" in message
+    assert "clés acceptées" in message
+
+
+def test_manual_provider_skips_option_validation(tmp_path):
+    # Arrange — 'manual' n'a pas de contrat d'options (pas de provider_cfg)
+    from tableforge.config import GenerateConfig
+    project = _project(tmp_path)
+    kind = project.kind("nappes").model_copy(
+        update={"generate": GenerateConfig(**{"with": "manual", "n_importe_quoi": 1})})
+    project = project.model_copy(update={"kinds": {**project.kinds, "nappes": kind}})
+
+    # Act
+    spec = build_kind_spec(project, "nappes")
+
+    # Assert
+    assert spec.provider_name == "manual"

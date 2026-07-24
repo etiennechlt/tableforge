@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 import jinja2
+from pydantic import ValidationError
 
 from .catalog import (DEFAULT_MUSIC_LENGTH_MS, MUSIC_MAX_MS, MUSIC_MIN_MS,
                       SFX_MAX_S, SFX_MIN_S, catalog_entries, clamp_music_length_ms,
@@ -19,7 +20,7 @@ from .config import KindConfig, ProjectConfig
 from .data import load_rows
 from .paths import asset_dir, asset_path
 from .prompts import load_prompts, prompt_for, reference_data_urls
-from .providers.base import resolve_provider_name
+from .providers.base import options_model, resolve_provider_name
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ def build_kind_spec(project: ProjectConfig, kind: str,
     provider_name = resolve_provider_name(project, kind_cfg)
     provider_cfg = project.providers.get(provider_name)  # None si 'manual'
     options = kind_cfg.generate.extras() if kind_cfg.generate else {}
+    _validate_options(kind_cfg.name, kind_cfg.asset, provider_cfg, options)
     if kind_cfg.asset in ("music", "sfx"):
         targets, output_format = _audio_spec(kind_cfg, options, ids)
     elif kind_cfg.asset == "image":
@@ -75,6 +77,31 @@ def build_kind_spec(project: ProjectConfig, kind: str,
                     provider_name=provider_name, options=options,
                     targets=tuple(targets), root=project.root,
                     output_format=output_format)
+
+
+def _validate_options(kind_name: str, asset: str, provider_cfg, options: dict) -> None:
+    """Valide `options` (generate.extras()) contre le modèle pydantic du couple
+    (type de provider, asset) quand il en existe un — mêmes clés acceptées et
+    même message que le linter (`validate_project`/`_kind_issues` dans
+    providers/base.py), mais appliqué ici, au moment du plan : couvre donc aussi
+    `forge generate`/`--dry-run`/`forge studio`, pas seulement `forge list`.
+    `provider_cfg` est None pour le provider réservé 'manual' (pas de contrat
+    d'API à valider)."""
+    if provider_cfg is None:
+        return
+    model = options_model(provider_cfg.type, asset)
+    if model is None:
+        return
+    try:
+        model(**options)
+    except ValidationError as exc:
+        accepted = ", ".join(model.model_fields) or "aucune"
+        unknown = sorted(set(options) - set(model.model_fields))
+        detail = f" — clé(s) inconnue(s) : {', '.join(unknown)}" if unknown else ""
+        raise ValueError(
+            f"kind '{kind_name}' : options generate: invalides pour "
+            f"{provider_cfg.type}/{asset}{detail} "
+            f"(clés acceptées : {accepted})") from exc
 
 
 def _image_targets(project: ProjectConfig, kind_cfg: KindConfig,

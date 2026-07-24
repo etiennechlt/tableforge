@@ -252,7 +252,7 @@ erreur bloquante (nommant les deux fichiers) à l'exécution seulement.
 | Commande | Évolution |
 |---|---|
 | `forge list` | Linter : validation complète (options extra=forbid, capacités provider/asset, voix, cohérence i2v) + affichage modalité/provider/état des fichiers par kind |
-| `forge generate <kind>` | Surface inchangée (`--id`, `--dry-run`, `--force`), toutes modalités ; dry-run affiche requête résumée + note d'auth (noms de variables d'env uniquement) |
+| `forge generate <kind>` | Surface inchangée (`--id`, `--dry-run`, `--force`), toutes modalités ; dry-run affiche ids + notes (clamps/avertissements) + note d'auth (noms de variables d'env uniquement) ; la requête détaillée s'inspecte via `forge studio` / les tests |
 | `forge studio <kind> [--id]` | NOUVELLE : fiche par entrée — prompt assemblé, réglages, chemin de dépôt attendu, URL du bon écran (app/music, app/sound-effects, app/speech-synthesis, ou `studio_url:`) |
 | `forge voices` | NOUVEL utilitaire : `list` (bibliothèque + vérif map `voices:`), `design "<description>"` (aperçus → sauvegarde). Ligne de coupe n°1 |
 | `forge render / board / sheet` | Inchangées ; refus pédagogique sur kind non-image (« le kind 'narration' est audio (tts) — rien à rendre ») |
