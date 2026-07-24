@@ -178,3 +178,22 @@ def test_provider_for_routes_elevenlabs_and_manual_in_p1(tmp_path):
     project = _project(tmp_path)
     assert isinstance(provider_for(project, project.kind("nappes")), ElevenLabsProvider)
     assert isinstance(provider_for(project, project.kind("affiche")), ManualProvider)
+
+
+def test_provider_for_raises_french_value_error_for_unimplemented_type(tmp_path):
+    # higgsfield est déclaré (SUPPORTED_ASSETS le sait produire) mais absent du
+    # registre _PROVIDER_FACTORIES : provider_for doit refuser explicitement
+    # (ValueError française), pas planter avec un KeyError silencieux.
+    from tableforge.providers.base import provider_for
+    forge = FORGE.replace(
+        "  eleven:\n    type: elevenlabs\n",
+        "  eleven:\n    type: elevenlabs\n  higgs:\n    type: higgsfield\n",
+    ) + """  poster:
+    asset: image
+    prompts: prompts/poster.yaml
+    generate: {with: higgs}
+"""
+    (tmp_path / "forge.yaml").write_text(forge, encoding="utf-8")
+    project = load_project(tmp_path)
+    with pytest.raises(ValueError, match="higgsfield arrive en P3"):
+        provider_for(project, project.kind("poster"))

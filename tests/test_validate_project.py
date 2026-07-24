@@ -92,6 +92,23 @@ def test_validate_clean_project_returns_empty(tmp_path):
     assert validate_project(_project(tmp_path, FORGE_CLEAN)) == []
 
 
+def test_validate_kind_without_generate_still_flags_sheet_and_from(tmp_path):
+    # Un kind sans bloc generate: (ex. purement manuel/hors-scope génération)
+    # doit quand même être passé au crible pour sheet/from — _kind_issues
+    # retourne tôt après ces contrôles quand generate est absent, sans jamais
+    # tenter de résoudre un provider.
+    forge = FORGE_CLEAN + """
+  affichette:
+    asset: music
+    from: nulle-part
+    sheet: {page: A4, cols: 1, rows: 1, card_w_mm: 10, card_h_mm: 10}
+"""
+    issues = validate_project(_project(tmp_path, forge))
+    text = "\n".join(issues)
+    assert "sheet" in text
+    assert "nulle-part" in text
+
+
 def test_provider_for_routes_elevenlabs_and_manual(tmp_path):
     project = _project(tmp_path, FORGE_CLEAN)
     assert isinstance(provider_for(project, project.kind("musiques")), ElevenLabsProvider)

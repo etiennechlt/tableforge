@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Callable, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
@@ -128,24 +128,42 @@ def ensure_provider(obj) -> Provider:
     return _LegacyAdapter(obj)
 
 
+def _seedream_provider(cfg) -> Provider:
+    from .seedream import SeedreamProvider
+    return SeedreamProvider.from_provider_config(cfg)
+
+
+def _elevenlabs_provider(cfg) -> Provider:
+    from .elevenlabs import ElevenLabsProvider
+    return ElevenLabsProvider.from_config(cfg)
+
+
+# Registre {type de provider: factory}. Ajouter un provider = une entrée ici,
+# pas une branche if/elif de plus — chaque factory importe localement pour
+# éviter tout cycle d'import au chargement du package (providers/__init__.py
+# reste léger, sans import eager d'elevenlabs/manual/seedream).
+_PROVIDER_FACTORIES: dict[str, Callable[..., Provider]] = {
+    "seedream": _seedream_provider,
+    "elevenlabs": _elevenlabs_provider,
+}
+
+
 def provider_for(project: ProjectConfig, kind_cfg: KindConfig) -> Provider:
-    """Instancie le provider d'un kind : registre par type plutôt qu'un if-chain
-    qui grossirait à chaque phase. Imports locaux : ils évitent tout cycle
-    d'import au chargement du package (providers/__init__.py reste léger)."""
+    """Instancie le provider d'un kind via `_PROVIDER_FACTORIES` (registre par
+    type). `manual` reste un cas à part : c'est un nom réservé, jamais une
+    entrée de `project.providers` (cf. `_normalize_providers`), donc il n'a
+    pas de `cfg.type` sur lequel indexer le registre."""
     name = resolve_provider_name(project, kind_cfg)
     if name == "manual":
         from .manual import ManualProvider
         return ManualProvider()
     cfg = project.providers[name]
-    if cfg.type == "seedream":
-        from .seedream import SeedreamProvider
-        return SeedreamProvider.from_provider_config(cfg)
-    if cfg.type == "elevenlabs":
-        from .elevenlabs import ElevenLabsProvider
-        return ElevenLabsProvider.from_config(cfg)
-    raise ValueError(
-        f"provider '{name}' : type '{cfg.type}' pas encore pris en charge "
-        "pour la génération (higgsfield arrive en P3)")
+    factory = _PROVIDER_FACTORIES.get(cfg.type)
+    if factory is None:
+        raise ValueError(
+            f"provider '{name}' : type '{cfg.type}' pas encore pris en charge "
+            "pour la génération (higgsfield arrive en P3)")
+    return factory(cfg)
 
 
 def validate_project(project: ProjectConfig) -> list[str]:
