@@ -19,6 +19,10 @@ kinds:
     prompts: prompts/sfx.yaml
     generate: { with: manual }
     studio_url: https://example.test/atelier
+  manuel_sans_url:
+    asset: sfx
+    prompts: prompts/sfx.yaml
+    generate: { with: manual }
 """
 
 MUSIC = """
@@ -66,6 +70,11 @@ def test_sfx_cards_point_to_sound_effects(tmp_path):
 def test_kind_studio_url_wins_over_defaults(tmp_path):
     cards = studio_cards(_project(tmp_path), "affiche")
     assert cards[0].url == "https://example.test/atelier"
+
+
+def test_manual_kind_without_studio_url_has_no_url(tmp_path):
+    cards = studio_cards(_project(tmp_path), "manuel_sans_url")
+    assert cards[0].url is None
 
 
 def test_ids_filter(tmp_path):
