@@ -91,6 +91,29 @@ def test_cli_voices_list_shows_mapping(tmp_path, monkeypatch):
     assert "mappée" not in alice_line
 
 
+def test_cli_voices_list_without_api_key_shows_clean_error(tmp_path, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+
+    res = runner.invoke(app, ["voices", "list", "--project", str(tmp_path)])
+
+    assert res.exit_code != 0
+    assert "ELEVENLABS_API_KEY" in res.output
+    assert "Traceback" not in res.output
+
+
+def test_cli_voices_design_without_api_key_shows_clean_error(tmp_path, monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+
+    res = runner.invoke(app, ["voices", "design", "vieille reine rauque",
+                              "--project", str(tmp_path)])
+
+    assert res.exit_code != 0
+    assert "ELEVENLABS_API_KEY" in res.output
+    assert "Traceback" not in res.output
+
+
 @respx.mock
 def test_design_previews_posts_description():
     from tableforge.voices import design_previews

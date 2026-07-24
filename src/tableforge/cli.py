@@ -30,7 +30,10 @@ def voices_list(project: Path = ProjectOpt):
         eleven = elevenlabs_config(cfg)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
-    key = resolve_api_key(eleven.api_key_env)
+    try:
+        key = resolve_api_key(eleven.api_key_env)
+    except RuntimeError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     lines = format_voice_lines(fetch_voices(eleven, key), cfg.voices)
     if not lines:
         typer.echo("aucune voix sur ce compte")
@@ -55,7 +58,10 @@ def voices_design(description: str,
         raise typer.BadParameter(str(exc)) from exc
     if save and not name:
         raise typer.BadParameter("--save exige --name NOM")
-    key = resolve_api_key(eleven.api_key_env)
+    try:
+        key = resolve_api_key(eleven.api_key_env)
+    except RuntimeError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     previews = design_previews(eleven, key, description)
     if not previews:
         typer.echo("aucun aperçu renvoyé par l'API")
