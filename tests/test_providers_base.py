@@ -168,10 +168,13 @@ def test_provider_for_builds_keyless_seedream(tmp_path, monkeypatch):
     assert provider.api_key is None and provider.api_key_env == "ARK_API_KEY"
 
 
-def test_provider_for_other_types_not_implemented_in_p0(tmp_path):
+def test_provider_for_routes_elevenlabs_and_manual_in_p1(tmp_path):
+    # P1 (task 9) : provider_for route désormais elevenlabs et manual au lieu de
+    # lever NotImplementedError (P0 stub). Higgsfield reste non pris en charge
+    # (ValueError, cf. tests/test_validate_project.py) jusqu'à P3.
     from tableforge.providers.base import provider_for
+    from tableforge.providers.elevenlabs import ElevenLabsProvider
+    from tableforge.providers.manual import ManualProvider
     project = _project(tmp_path)
-    with pytest.raises(NotImplementedError):
-        provider_for(project, project.kind("nappes"))       # elevenlabs -> P1
-    with pytest.raises(NotImplementedError):
-        provider_for(project, project.kind("affiche"))      # manual -> P1
+    assert isinstance(provider_for(project, project.kind("nappes")), ElevenLabsProvider)
+    assert isinstance(provider_for(project, project.kind("affiche")), ManualProvider)

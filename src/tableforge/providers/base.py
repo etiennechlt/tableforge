@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..config import KindConfig, ProjectConfig
 from ..paths import asset_path
@@ -129,13 +129,66 @@ def ensure_provider(obj) -> Provider:
 
 
 def provider_for(project: ProjectConfig, kind_cfg: KindConfig) -> Provider:
+    """Instancie le provider d'un kind : registre par type plutôt qu'un if-chain
+    qui grossirait à chaque phase. Imports locaux : ils évitent tout cycle
+    d'import au chargement du package (providers/__init__.py reste léger)."""
     name = resolve_provider_name(project, kind_cfg)
     if name == "manual":
-        raise NotImplementedError(
-            "provider 'manual' : disponible en P1 (forge studio)")
+        from .manual import ManualProvider
+        return ManualProvider()
     cfg = project.providers[name]
     if cfg.type == "seedream":
         from .seedream import SeedreamProvider
         return SeedreamProvider.from_provider_config(cfg)
-    raise NotImplementedError(
-        f"provider de type '{cfg.type}' : pas encore implémenté (phases P1+)")
+    if cfg.type == "elevenlabs":
+        from .elevenlabs import ElevenLabsProvider
+        return ElevenLabsProvider.from_config(cfg)
+    raise ValueError(
+        f"provider '{name}' : type '{cfg.type}' pas encore pris en charge "
+        "pour la génération (higgsfield arrive en P3)")
+
+
+def validate_project(project: ProjectConfig) -> list[str]:
+    """Linter de forge.yaml : liste de problèmes en français (vide si tout est bon)."""
+    issues: list[str] = []
+    for name, kind_cfg in project.kinds.items():
+        issues.extend(_kind_issues(project, name, kind_cfg))
+    return issues
+
+
+def _kind_issues(project: ProjectConfig, name: str, kind_cfg: KindConfig) -> list[str]:
+    issues: list[str] = []
+    if kind_cfg.sheet is not None and kind_cfg.asset != "image":
+        issues.append(f"kind '{name}' : bloc 'sheet' sur un asset {kind_cfg.asset} "
+                      "(réservé aux kinds image)")
+    if kind_cfg.from_ is not None:
+        source = project.kinds.get(kind_cfg.from_)
+        if source is None:
+            issues.append(f"kind '{name}' : from: '{kind_cfg.from_}' ne désigne "
+                          "aucun kind déclaré")
+        elif source.asset != "image":
+            issues.append(f"kind '{name}' : from: '{kind_cfg.from_}' doit être un kind "
+                          f"image (trouvé : {source.asset})")
+    if kind_cfg.generate is None:
+        return issues
+    try:
+        provider_name = resolve_provider_name(project, kind_cfg)
+    except ValueError as exc:
+        issues.append(str(exc))
+        return issues
+    provider_type = ("manual" if provider_name == "manual"
+                     else project.providers[provider_name].type)
+    extras = kind_cfg.generate.extras()
+    voice = extras.get("voice")
+    if isinstance(voice, str) and voice not in project.voices:
+        declared = ", ".join(project.voices) or "aucune"
+        issues.append(f"kind '{name}' : voix '{voice}' inconnue (déclarées : {declared})")
+    model = options_model(provider_type, kind_cfg.asset)
+    if model is not None:
+        try:
+            model(**extras)
+        except ValidationError:
+            accepted = ", ".join(model.model_fields) or "aucune"
+            issues.append(f"kind '{name}' : options generate: invalides pour "
+                          f"{provider_type}/{kind_cfg.asset} (clés acceptées : {accepted})")
+    return issues
