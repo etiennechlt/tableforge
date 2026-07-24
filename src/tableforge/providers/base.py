@@ -85,9 +85,26 @@ class SfxOptions(BaseModel):
     loop: Optional[bool] = None
 
 
+class ElevenLabsTtsOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    voice: Optional[str] = None
+    voice_field: Optional[str] = None
+    text: Optional[str] = None
+    model: Optional[str] = None
+    language: Optional[str] = None
+    seed: Optional[int] = None
+
+
+class ElevenLabsDialogueOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: Optional[str] = None
+
+
 _OPTION_MODELS: dict[tuple[str, str], type[BaseModel]] = {
     ("elevenlabs", "music"): MusicOptions,
     ("elevenlabs", "sfx"): SfxOptions,
+    ("elevenlabs", "tts"): ElevenLabsTtsOptions,
+    ("elevenlabs", "dialogue"): ElevenLabsDialogueOptions,
 }
 
 
