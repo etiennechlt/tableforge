@@ -371,7 +371,7 @@ def _i2v_targets(project: ProjectConfig, kind_cfg: KindConfig,
         notes: list[str] = []
         if not source_image.exists():
             notes.append(f"art source manquant : {source_image} — lance d'abord "
-                        f"`forge generate {source_name}`")
+                         f"`forge generate {source_name}`")
         if target_id in known_entries:
             text = prompt_for_entry(target_id, catalog_cfg)
             settings = _video_settings(catalog_cfg, get_entry(catalog_cfg, target_id))
