@@ -19,12 +19,23 @@ NB (Step 0, P3a Task 2) — vérification doc API (docs.higgsfield.ai) :
 """
 from __future__ import annotations
 
+import os
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Optional
 
 import httpx
+import typer
+from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict
 
+from ..config import HiggsfieldProviderConfig
 from ..errors import raise_with_hint
+from ..paths import asset_path
+from ..prompts import encode_image_data_url
+from ..targets import KindSpec, Target
+from .base import AssetJob
 
 SUBMIT_TIMEOUT = 60.0
 _TERMINAL_FAILURES = ("failed", "nsfw")
@@ -128,3 +139,105 @@ def _result_url(payload: dict) -> str:
     raise RuntimeError(
         "Higgsfield : réponse 'completed' sans URL de résultat reconnue — vérifie le "
         "format de GET /requests/{id}/status sur docs.higgsfield.ai.")
+
+
+DOWNLOAD_TIMEOUT = 300.0
+
+
+class HiggsfieldVideoOptions(BaseModel):
+    """Options acceptées dans generate: pour (higgsfield, video)."""
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    aspect_ratio: Optional[str] = None
+    resolution: Optional[str] = None
+    duration_s: Optional[float] = None
+
+
+def _video_body(target: Target, options: HiggsfieldVideoOptions) -> dict:
+    body: dict = {"prompt": target.text}
+    if options.aspect_ratio:
+        body["aspect_ratio"] = options.aspect_ratio
+    if options.resolution:
+        body["resolution"] = options.resolution
+    duration = target.settings.get("duration_s", options.duration_s)
+    if duration is not None:
+        # Nom du champ côté API à confronter à docs.higgsfield.ai ('duration', secondes).
+        body["duration"] = duration
+    return body
+
+
+@dataclass(frozen=True)
+class HiggsfieldProvider:
+    api_key_env: str
+    api_secret_env: str
+    base_url: str
+    default_image_model: str
+    poll_interval_s: float
+    poll_timeout_s: float
+    sleep: Callable[[float], None] = time.sleep
+
+    @classmethod
+    def from_config(cls, cfg: HiggsfieldProviderConfig) -> "HiggsfieldProvider":
+        return cls(api_key_env=cfg.api_key_env, api_secret_env=cfg.api_secret_env,
+                   base_url=cfg.base_url, default_image_model=cfg.default_image_model,
+                   poll_interval_s=cfg.poll_interval_s, poll_timeout_s=cfg.poll_timeout_s)
+
+    def plan(self, spec: KindSpec) -> list[AssetJob]:
+        if spec.asset != "video":
+            raise ValueError(
+                f"provider higgsfield : asset '{spec.asset}' non géré en P3a — seuls "
+                "les kinds video sont acceptés (l'image Higgsfield arrive en P3b).")
+        options = HiggsfieldVideoOptions(**spec.options)
+        jobs: list[AssetJob] = []
+        for target in spec.targets:
+            body = _video_body(target, options)
+            summary_body = dict(body)
+            payload: dict = {"kind": spec.kind}
+            if target.source_image is not None:
+                summary_body["image"] = f"[image source : {target.source_image}]"
+                if target.source_image.exists():
+                    body = {**body, "image": encode_image_data_url(target.source_image)}
+                else:
+                    payload["missing_source"] = (
+                        f"art source manquant : {target.source_image} — génère d'abord "
+                        "l'art du kind source (forge generate).")
+            payload["submit"] = build_submit(options.model, body)
+            jobs.append(AssetJob(
+                id=target.id,
+                dest=asset_path(spec.root, "video", spec.kind, target.id),
+                request={"path": payload["submit"]["path"], "json": summary_body},
+                payload=payload,
+                notes=target.notes,
+            ))
+        return jobs
+
+    def _require_keys(self) -> tuple[str, str]:
+        load_dotenv()
+        key = os.environ.get(self.api_key_env)
+        secret = os.environ.get(self.api_secret_env)
+        missing = [name for name, value in ((self.api_key_env, key),
+                                            (self.api_secret_env, secret)) if not value]
+        if missing:
+            raise RuntimeError(
+                f"{' et '.join(missing)} manquant(s) : copie .env.example vers .env et "
+                "renseigne tes clés (crée-les sur https://platform.higgsfield.ai).")
+        return key, secret
+
+    def execute(self, job: AssetJob) -> list[Path]:
+        missing_source = job.payload.get("missing_source")
+        if missing_source:
+            raise RuntimeError(missing_source)
+        api_key, api_secret = self._require_keys()
+        kind = str(job.payload.get("kind", "video"))
+        request_id = submit(self, job.payload["submit"],
+                            api_key=api_key, api_secret=api_secret, kind=kind)
+        typer.echo(f"  {job.id}: requête higgsfield {request_id}")
+        payload = poll(self, request_id, api_key=api_key, api_secret=api_secret,
+                       sleep=self.sleep, kind=kind,
+                       on_status=lambda status: typer.echo(f"  {job.id}: {status}"))
+        url = _result_url(payload)
+        response = httpx.get(url, timeout=DOWNLOAD_TIMEOUT)
+        response.raise_for_status()
+        job.dest.parent.mkdir(parents=True, exist_ok=True)
+        job.dest.write_bytes(response.content)
+        return [job.dest]

@@ -1,11 +1,17 @@
 import json
+from dataclasses import replace
+from pathlib import Path
 
 import httpx
 import pytest
 import respx
+from PIL import Image
+from pydantic import ValidationError
 
 from tableforge.config import HiggsfieldProviderConfig
-from tableforge.providers.higgsfield import _result_url, build_submit, poll, submit
+from tableforge.providers.higgsfield import (HiggsfieldProvider, HiggsfieldVideoOptions,
+                                             _result_url, build_submit, poll, submit)
+from tableforge.targets import KindSpec, Target
 
 BASE = "https://platform.higgsfield.ai"
 
@@ -174,3 +180,148 @@ def test_result_url_fallbacks_when_video_key_absent():
     assert _result_url({"url": "d"}) == "d"
     with pytest.raises(RuntimeError, match="docs.higgsfield.ai"):
         _result_url({"status": "completed"})
+
+
+def _spec(tmp_path, targets, options=None, kind="teaser"):
+    return KindSpec(kind=kind, asset="video", provider_name="higgsfield",
+                    options=options or {"model": "kling-video/v2.1/standard/text-to-video"},
+                    targets=tuple(targets), output_format=None, root=tmp_path)
+
+
+def test_video_options_reject_unknown_keys():
+    # Arrange / Act / Assert
+    with pytest.raises(ValidationError):
+        HiggsfieldVideoOptions(model="m", fps=24)
+
+
+def test_video_options_require_model():
+    with pytest.raises(ValidationError):
+        HiggsfieldVideoOptions(aspect_ratio="16:9")
+
+
+def test_plan_t2v_builds_submit_jobs(tmp_path):
+    # Arrange
+    provider = HiggsfieldProvider.from_config(_cfg())
+    spec = _spec(tmp_path,
+                 [Target(id="intro", text="A ruined throne room",
+                         settings={"duration_s": 8})],
+                 options={"model": "kling-video/v2.1/standard/text-to-video",
+                          "aspect_ratio": "16:9"})
+
+    # Act
+    jobs = provider.plan(spec)
+
+    # Assert
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.id == "intro"
+    assert job.dest == tmp_path / "out" / "video" / "teaser" / "intro.mp4"
+    assert job.request["path"] == "/kling-video/v2.1/standard/text-to-video"
+    assert job.request["json"] == {"prompt": "A ruined throne room",
+                                   "aspect_ratio": "16:9", "duration": 8}
+    assert job.payload["submit"]["json"] == job.request["json"]
+
+
+def test_plan_kind_duration_is_fallback_only(tmp_path):
+    # Arrange — duration_s au niveau kind, surchargée par les settings de la cible
+    provider = HiggsfieldProvider.from_config(_cfg())
+    options = {"model": "m/slug", "duration_s": 4}
+    spec = _spec(tmp_path, [Target(id="a", text="x", settings={"duration_s": 9}),
+                            Target(id="b", text="y")], options=options)
+
+    # Act
+    jobs = provider.plan(spec)
+
+    # Assert
+    assert jobs[0].request["json"]["duration"] == 9
+    assert jobs[1].request["json"]["duration"] == 4
+
+
+def test_plan_i2v_encodes_source_image_only_in_payload(tmp_path):
+    # Arrange
+    art = tmp_path / "out" / "art" / "cards" / "lame.png"
+    art.parent.mkdir(parents=True)
+    Image.new("RGB", (8, 8), "red").save(art)
+    provider = HiggsfieldProvider.from_config(_cfg())
+    spec = _spec(tmp_path, [Target(id="lame", text="wind", source_image=art)],
+                 kind="cartes-animees",
+                 options={"model": "bytedance/seedance/v1/image-to-video"})
+
+    # Act
+    job = provider.plan(spec)[0]
+
+    # Assert — data-URL dans payload, jamais dans request
+    assert job.payload["submit"]["json"]["image"].startswith("data:image/jpeg;base64,")
+    assert job.request["json"]["image"] == f"[image source : {art}]"
+    assert "data:" not in str(job.request)
+    assert job.dest == tmp_path / "out" / "video" / "cartes-animees" / "lame.mp4"
+
+
+def test_plan_i2v_missing_art_defers_error_to_execute(tmp_path):
+    # Arrange — l'art n'existe pas : note en dry-run, erreur à l'exécution
+    art = tmp_path / "out" / "art" / "cards" / "lame.png"
+    note = f"art source manquant : {art} — lance d'abord `forge generate cards`"
+    provider = HiggsfieldProvider.from_config(_cfg())
+    spec = _spec(tmp_path,
+                 [Target(id="lame", text="wind", source_image=art, notes=(note,))],
+                 kind="cartes-animees",
+                 options={"model": "bytedance/seedance/v1/image-to-video"})
+
+    # Act
+    job = provider.plan(spec)[0]
+
+    # Assert
+    assert "image" not in job.payload["submit"]["json"]
+    assert job.request["json"]["image"] == f"[image source : {art}]"
+    assert note in job.notes
+    with pytest.raises(RuntimeError, match="art source manquant"):
+        provider.execute(job)
+
+
+def test_plan_rejects_non_video_asset(tmp_path):
+    # Arrange — l'image Higgsfield n'arrive qu'en P3b
+    provider = HiggsfieldProvider.from_config(_cfg())
+    spec = replace(_spec(tmp_path, [Target(id="x", text="x")]), asset="image")
+
+    # Act / Assert
+    with pytest.raises(ValueError, match="P3b"):
+        provider.plan(spec)
+
+
+@respx.mock
+def test_execute_submits_polls_downloads(tmp_path, monkeypatch, capsys):
+    # Arrange
+    monkeypatch.setenv("HIGGSFIELD_API_KEY", "k")
+    monkeypatch.setenv("HIGGSFIELD_API_SECRET", "s")
+    submit_route = respx.post(f"{BASE}/kling-video/v2.1/standard/text-to-video").mock(
+        return_value=httpx.Response(200, json={"request_id": "req-42"}))
+    respx.get(f"{BASE}/requests/req-42/status").mock(
+        return_value=httpx.Response(200, json={
+            "status": "completed", "results": [{"url": "https://cdn.x/v.mp4"}]}))
+    respx.get("https://cdn.x/v.mp4").mock(
+        return_value=httpx.Response(200, content=b"MP4DATA"))
+    provider = HiggsfieldProvider.from_config(_cfg())
+    job = provider.plan(_spec(tmp_path, [Target(id="intro", text="ruins")]))[0]
+
+    # Act
+    saved = provider.execute(job)
+
+    # Assert
+    dest = tmp_path / "out" / "video" / "teaser" / "intro.mp4"
+    assert saved == [dest]
+    assert dest.read_bytes() == b"MP4DATA"
+    assert submit_route.calls.last.request.headers["authorization"] == "Key k:s"
+    out = capsys.readouterr().out
+    assert "intro: completed" in out
+
+
+def test_execute_requires_both_keys(tmp_path, monkeypatch):
+    # Arrange
+    monkeypatch.delenv("HIGGSFIELD_API_KEY", raising=False)
+    monkeypatch.delenv("HIGGSFIELD_API_SECRET", raising=False)
+    provider = HiggsfieldProvider.from_config(_cfg())
+    job = provider.plan(_spec(tmp_path, [Target(id="intro", text="x")]))[0]
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="HIGGSFIELD_API_KEY et HIGGSFIELD_API_SECRET"):
+        provider.execute(job)
