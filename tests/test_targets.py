@@ -26,8 +26,9 @@ kinds:
     render_size: {width: 10, height: 10}
     generate: {with: ark}
   nappes:
-    asset: dialogue
+    asset: video
     prompts: prompts/nappes.yaml
+    generate: {with: manual}
 """
 
 PROMPTS = """
@@ -78,10 +79,10 @@ def test_image_kind_without_prompts_raises(tmp_path):
 
 
 def test_non_image_asset_not_implemented_in_p0(tmp_path):
-    # 'sfx' est devenu implémenté en P1 (task-6-brief.md) ; ce garde-fou vise
-    # désormais un asset encore NYI (dialogue, prévu P2) pour continuer à
-    # couvrir la branche NotImplementedError de build_kind_spec.
-    with pytest.raises(NotImplementedError, match="dialogue"):
+    # 'sfx' (P1) puis 'dialogue' (P2, task-4-brief.md) sont désormais implémentés ;
+    # ce garde-fou vise le dernier asset encore NYI (video, prévu P3) pour continuer
+    # à couvrir la branche NotImplementedError de build_kind_spec.
+    with pytest.raises(NotImplementedError, match="video"):
         build_kind_spec(_project(tmp_path), "nappes")
 
 

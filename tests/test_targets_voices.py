@@ -191,3 +191,50 @@ def test_tts_rows_filter_by_ids(tmp_path):
     spec = build_kind_spec(project, "narration", ids=["emissaire"])
 
     assert [t.id for t in spec.targets] == ["emissaire"]
+
+
+DIALOGUES = """
+entries:
+  intro:
+    lines:
+      - { voice: heraut, text: "Oyez !" }
+      - { voice: vieille-reine, text: "Silence." }
+"""
+
+
+def test_dialogue_targets_resolve_lines_to_voice_ids(tmp_path):
+    project = _project(tmp_path, {"prompts/dialogues.yaml": DIALOGUES})
+
+    spec = build_kind_spec(project, "dialogues")
+
+    assert spec.asset == "dialogue"
+    intro = spec.targets[0]
+    assert [line.voice_id for line in intro.lines] == ["id-heraut", "id-vieille-reine"]
+    assert [line.text for line in intro.lines] == ["Oyez !", "Silence."]
+    assert intro.text == "heraut: Oyez !\nvieille-reine: Silence."
+
+
+def test_dialogue_entry_without_lines_raises(tmp_path):
+    catalog = 'entries:\n  intro: { prompt: "pas des lines" }\n'
+    project = _project(tmp_path, {"prompts/dialogues.yaml": catalog})
+
+    with pytest.raises(ValueError, match="lines"):
+        build_kind_spec(project, "dialogues")
+
+
+def test_dialogue_line_missing_voice_raises(tmp_path):
+    catalog = 'entries:\n  intro:\n    lines:\n      - { text: "Sans voix." }\n'
+    project = _project(tmp_path, {"prompts/dialogues.yaml": catalog})
+
+    with pytest.raises(ValueError, match="requis"):
+        build_kind_spec(project, "dialogues")
+
+
+def test_dialogue_unknown_voice_lists_declared_voices(tmp_path):
+    catalog = 'entries:\n  intro:\n    lines:\n      - { voice: spectre, text: "Bouh." }\n'
+    project = _project(tmp_path, {"prompts/dialogues.yaml": catalog})
+
+    with pytest.raises(KeyError, match="voix inconnue") as excinfo:
+        build_kind_spec(project, "dialogues")
+
+    assert "heraut" in str(excinfo.value)

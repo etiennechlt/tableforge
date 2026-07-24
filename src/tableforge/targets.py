@@ -64,6 +64,9 @@ def build_kind_spec(project: ProjectConfig, kind: str,
     elif kind_cfg.asset == "tts":
         targets = _tts_targets(project, kind_cfg, options, ids)
         output_format = _catalog_output_format(kind_cfg)
+    elif kind_cfg.asset == "dialogue":
+        targets = _dialogue_targets(project, kind_cfg, options, ids)
+        output_format = _catalog_output_format(kind_cfg)
     else:
         raise NotImplementedError(
             f"asset '{kind_cfg.asset}' : pas encore implémenté "
@@ -235,6 +238,38 @@ def _tts_targets_from_rows(project: ProjectConfig, kind_cfg: KindConfig,
                 "generate.voice ou generate.voice_field")
         voice_id = _resolve_voice(str(voice_name), project.voices, kind=kind_cfg.name)
         targets.append(Target(id=row.id, text=text, voice_id=voice_id))
+    return tuple(targets)
+
+
+# --- P2 : cibles dialogue multi-voix ----------------------------------------
+
+def _dialogue_targets(project: ProjectConfig, kind_cfg: KindConfig,
+                      options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if kind_cfg.prompts is None:
+        raise ValueError(f"le kind dialogue '{kind_cfg.name}' n'a pas de fichier prompts")
+    cfg = load_catalog(kind_cfg.prompts)
+    target_ids = ids or list(catalog_entries(cfg))
+    targets: list[Target] = []
+    for entry_id in target_ids:
+        entry = get_entry(cfg, entry_id)
+        raw_lines = entry.get("lines")
+        if not isinstance(raw_lines, list) or not raw_lines:
+            raise ValueError(
+                f"kind '{kind_cfg.name}', entrée '{entry_id}' : liste 'lines' requise "
+                "(éléments {voice, text})")
+        lines: list[DialogueLine] = []
+        display: list[str] = []
+        for index, raw in enumerate(raw_lines, start=1):
+            voice_name = raw.get("voice") if isinstance(raw, dict) else None
+            text = raw.get("text") if isinstance(raw, dict) else None
+            if not voice_name or not text:
+                raise ValueError(
+                    f"kind '{kind_cfg.name}', entrée '{entry_id}', ligne {index} : "
+                    "'voice' et 'text' sont requis")
+            voice_id = _resolve_voice(str(voice_name), project.voices, kind=kind_cfg.name)
+            lines.append(DialogueLine(voice_id=voice_id, text=str(text)))
+            display.append(f"{voice_name}: {text}")
+        targets.append(Target(id=entry_id, text="\n".join(display), lines=tuple(lines)))
     return tuple(targets)
 
 
