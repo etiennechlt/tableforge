@@ -128,6 +128,15 @@ def test_reserved_provider_names_rejected(tmp_path):
             load_project(_write(tmp_path, text))
 
 
+def test_higgsfield_poll_interval_s_zero_is_rejected(tmp_path):
+    text = NAMED.replace(
+        "    type: elevenlabs\n",
+        "    type: higgsfield\n    poll_interval_s: 0\n",
+    )
+    with pytest.raises(ValueError, match="poll_interval_s"):
+        load_project(_write(tmp_path, text))
+
+
 def test_unknown_provider_type_gets_french_error(tmp_path):
     text = NAMED.replace("type: elevenlabs", "type: bogus")
     with pytest.raises(ValueError, match="bogus"):

@@ -86,8 +86,8 @@ class HiggsfieldProviderConfig(BaseModel):
     api_secret_env: str = "HIGGSFIELD_API_SECRET"
     base_url: str = "https://platform.higgsfield.ai"
     default_image_model: str = "higgsfield-ai/soul/standard"
-    poll_interval_s: float = 5.0
-    poll_timeout_s: float = 600.0
+    poll_interval_s: float = Field(default=5.0, gt=0)
+    poll_timeout_s: float = Field(default=600.0, gt=0)
 
 
 AnyProviderConfig = Annotated[
