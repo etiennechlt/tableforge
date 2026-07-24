@@ -143,9 +143,13 @@ def generate(kind: str, project: Path = ProjectOpt,
              id: Optional[List[str]] = typer.Option(None, "--id", help="Limiter à ces ids."),
              dry_run: bool = typer.Option(False, "--dry-run"),
              force: bool = typer.Option(False, "--force")):
-    """Génère l'art IA d'un kind."""
+    """Génère les assets IA d'un kind (image, audio, vidéo)."""
     cfg = load_project(project)
-    results = generate_kind(cfg, kind, ids=id or None, dry_run=dry_run, force=force)
+    try:
+        results = generate_kind(cfg, kind, ids=id or None, dry_run=dry_run, force=force)
+    except RuntimeError as exc:
+        typer.secho(str(exc), fg="red")
+        raise typer.Exit(1) from exc
     for res in results:
         where = "(dry-run)" if res.dest is None else str(res.dest)
         typer.echo(f"{res.id}: {where}")

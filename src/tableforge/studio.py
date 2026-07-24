@@ -15,6 +15,9 @@ STUDIO_URLS: dict[tuple[str, str], str] = {
     ("elevenlabs", "tts"): "https://elevenlabs.io/app/speech-synthesis",
     ("elevenlabs", "dialogue"): "https://elevenlabs.io/app/speech-synthesis",
     ("higgsfield", "video"): "https://higgsfield.ai/create/video",
+    # NB : URL non vérifiée à date (par symétrie avec /create/video) — à confirmer
+    # sur higgsfield.ai si elle s'avère fausse.
+    ("higgsfield", "image"): "https://higgsfield.ai/create/image",
 }
 
 
@@ -46,6 +49,7 @@ def studio_cards(project: ProjectConfig, kind: str,
     jobs_by_id = {job.id: job for job in provider_for(project, kind_cfg).plan(spec)}
     url = _studio_url(project, kind_cfg, spec.provider_name, spec.asset)
     return [StudioCard(kind=kind, id=target.id, text=target.text,
-                       settings=dict(target.settings), dest=jobs_by_id[target.id].dest,
+                       settings={k: v for k, v in target.settings.items() if v is not None},
+                       dest=jobs_by_id[target.id].dest,
                        url=url, notes=target.notes)
             for target in spec.targets]

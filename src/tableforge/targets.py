@@ -110,7 +110,7 @@ def _image_targets(project: ProjectConfig, kind_cfg: KindConfig,
         raise ValueError(f"le kind '{kind_cfg.name}' n'a pas de fichier prompts")
     cfg = load_prompts(kind_cfg.prompts)
     size = kind_cfg.art_size or getattr(provider_cfg, "default_size", None)
-    target_ids = ids or list((cfg.get("prompts", {}) or {}).keys())
+    target_ids = ids if ids is not None else list((cfg.get("prompts", {}) or {}).keys())
     targets = []
     for asset_id in target_ids:
         prompt = prompt_for(asset_id, cfg)

@@ -112,6 +112,10 @@ def test_studio_urls_include_higgsfield_video():
     assert STUDIO_URLS[("higgsfield", "video")] == "https://higgsfield.ai/create/video"
 
 
+def test_studio_urls_include_higgsfield_image():
+    assert STUDIO_URLS[("higgsfield", "image")] == "https://higgsfield.ai/create/image"
+
+
 def test_studio_cards_for_t2v_kind_carry_url_and_dest(tmp_path):
     # Arrange
     (tmp_path / "forge.yaml").write_text(VIDEO_FORGE, encoding="utf-8")
@@ -129,3 +133,40 @@ def test_studio_cards_for_t2v_kind_carry_url_and_dest(tmp_path):
     assert card.url == "https://higgsfield.ai/create/video"
     assert card.dest == tmp_path / "out" / "video" / "teaser" / "intro.mp4"
     assert "A ruined throne room" in card.text
+
+
+# --- Revue finale de branche (item 7) : les réglages à None (ex. size sans
+# art_size ni default_size côté provider) sont omis de la fiche, pas affichés
+# "size=None" ---------------------------------------------------------------
+
+IMAGE_FORGE = """
+project: demo
+providers:
+  hf:
+    type: higgsfield
+kinds:
+  affiche-img:
+    asset: image
+    prompts: prompts/affiche.yaml
+    generate: {with: hf}
+"""
+
+AFFICHE_PROMPTS = """
+prompts:
+  cover: "A castle at dusk."
+"""
+
+
+def test_image_card_omits_none_valued_settings(tmp_path):
+    # Arrange — higgsfield n'a pas de default_size et le kind n'a pas d'art_size :
+    # settings={"size": None} côté Target, qui ne doit pas fuiter tel quel.
+    (tmp_path / "forge.yaml").write_text(IMAGE_FORGE, encoding="utf-8")
+    (tmp_path / "prompts").mkdir()
+    (tmp_path / "prompts" / "affiche.yaml").write_text(AFFICHE_PROMPTS, encoding="utf-8")
+    project = load_project(tmp_path)
+
+    # Act
+    cards = studio_cards(project, "affiche-img")
+
+    # Assert
+    assert cards[0].settings == {}

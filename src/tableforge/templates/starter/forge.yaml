@@ -66,3 +66,17 @@ kinds:
 #   asset: tts
 #   prompts: prompts/regles-audio.yaml
 #   generate: { with: eleven, voice: narrateur, language: fr }
+
+# --- Vidéo (Higgsfield) : exemple à décommenter
+# 1. Ajoute un provider higgsfield (clés : HIGGSFIELD_API_KEY + HIGGSFIELD_API_SECRET
+#    dans .env — comptes sur https://platform.higgsfield.ai) :
+#   providers:
+#     higgsfield:
+#       type: higgsfield
+# 2. Ajoute un kind vidéo i2v qui anime l'art déjà généré du kind `cards`
+#    (out/art/cards/<id>.png) :
+#
+# cartes-animees:                 # i2v : anime chaque carte de `cards`
+#   asset: video
+#   from: cards
+#   generate: { with: higgsfield, model: bytedance/seedance/v1/image-to-video }

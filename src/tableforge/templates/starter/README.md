@@ -9,7 +9,8 @@ forge generate cards               # art IA (nécessite ARK_API_KEY dans .env)  
 forge render cards                 # designs PNG -> out/render/cards/
 forge sheet cards                  # planche d'impression -> out/sheet/cards.pdf
 
-forge generate musiques --dry-run  # ambiances (nécessite ELEVENLABS_API_KEY)  [coûte $]
+forge generate musiques --dry-run  # ambiances : vérifie sans appel réseau
+forge generate musiques            # (nécessite ELEVENLABS_API_KEY dans .env)  [coûte $]
 forge generate sfx --dry-run       # effets sonores
 forge studio musiques              # /v1/music exige un plan payant ElevenLabs :
                                     # fiches copier-coller (texte, réglages, dest) si pas de clé

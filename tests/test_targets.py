@@ -283,6 +283,21 @@ def test_i2v_filters_ids_and_rejects_unknown(tmp_path):
         build_kind_spec(project, "cartes-animees", ids=["nope"])
 
 
+# --- Revue finale de branche (item 9) : ids=[] = zéro cible pour les images,
+# même sémantique que _filter_ids/_catalog_ids (tts/dialogue/video) ---------
+
+def test_ids_empty_list_selects_zero_image_targets(tmp_path):
+    # Arrange — ids=[] est un filtre explicite « zéro cible », pas « pas de
+    # filtre » (qui, lui, reste ids=None) — CLI passe toujours id ou None.
+    project = _project(tmp_path)
+
+    # Act
+    spec = build_kind_spec(project, "cards", ids=[])
+
+    # Assert
+    assert spec.targets == ()
+
+
 # --- Revue finale de branche (item 2) : validation unifiée des options au
 # plan (build_kind_spec), pas seulement au linter (forge list) --------------
 

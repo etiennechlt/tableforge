@@ -206,3 +206,19 @@ def test_dry_run_prints_manual_note_pointing_to_studio(tmp_path):
     assert res.exit_code == 0, res.output
     assert "note d'auth" in res.output
     assert "forge studio sort" in res.output
+
+
+# --- Revue finale de branche : clé manquante en vrai lancement (item 11) ----
+
+def test_generate_missing_key_prints_french_message_and_exits_1(tmp_path, monkeypatch):
+    # Arrange
+    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+    _audio_project(tmp_path)
+
+    # Act
+    res = runner.invoke(app, ["generate", "musiques", "--project", str(tmp_path)])
+
+    # Assert
+    assert res.exit_code == 1
+    assert "ELEVENLABS_API_KEY" in res.output
+    assert "Traceback" not in res.output
