@@ -39,6 +39,40 @@ def voices_list(project: Path = ProjectOpt):
         typer.echo(line)
 
 
+@voices_app.command("design")
+def voices_design(description: str,
+                  name: Optional[str] = typer.Option(None, "--name",
+                                                     help="Nom de la voix à enregistrer."),
+                  save: bool = typer.Option(False, "--save",
+                                            help="Enregistrer le premier aperçu."),
+                  project: Path = ProjectOpt):
+    """Génère des aperçus de voix depuis une description ; --save enregistre la première."""
+    from .voices import design_previews, elevenlabs_config, resolve_api_key, save_voice
+    cfg = load_project(project)
+    try:
+        eleven = elevenlabs_config(cfg)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if save and not name:
+        raise typer.BadParameter("--save exige --name NOM")
+    key = resolve_api_key(eleven.api_key_env)
+    previews = design_previews(eleven, key, description)
+    if not previews:
+        typer.echo("aucun aperçu renvoyé par l'API")
+        raise typer.Exit(1)
+    for preview in previews:
+        typer.echo(f"- aperçu : {preview.get('generated_voice_id')}")
+    if not save:
+        typer.echo("relance avec --save --name NOM pour enregistrer la première voix")
+        return
+    voice_id = save_voice(eleven, key, name=name, description=description,
+                          generated_voice_id=str(previews[0]["generated_voice_id"]))
+    typer.echo(f"voix enregistrée : {voice_id}")
+    typer.echo("à coller dans forge.yaml :")
+    typer.echo("voices:")
+    typer.echo(f"  {name}: {voice_id}")
+
+
 @app.command()
 def init(name: str, dest: Path = typer.Option(Path("."), "--dest", help="Dossier parent.")):
     """Crée un nouveau projet vierge."""

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import httpx
@@ -88,3 +89,84 @@ def test_cli_voices_list_shows_mapping(tmp_path, monkeypatch):
     assert "mappée : narrateur" in res.output
     alice_line = next(line for line in res.output.splitlines() if "Alice" in line)
     assert "mappée" not in alice_line
+
+
+@respx.mock
+def test_design_previews_posts_description():
+    from tableforge.voices import design_previews
+
+    cfg = ElevenLabsProviderConfig(type="elevenlabs")
+    route = respx.post("https://api.elevenlabs.io/v1/text-to-voice/design").mock(
+        return_value=httpx.Response(200, json={"previews": [
+            {"generated_voice_id": "gen-1"}, {"generated_voice_id": "gen-2"}]}))
+
+    previews = design_previews(cfg, "sk-test", "vieille reine rauque")
+
+    assert [p["generated_voice_id"] for p in previews] == ["gen-1", "gen-2"]
+    request = route.calls.last.request
+    assert request.headers["xi-api-key"] == "sk-test"
+    body = json.loads(request.content)
+    assert body["voice_description"] == "vieille reine rauque"
+
+
+@respx.mock
+def test_save_voice_returns_voice_id():
+    from tableforge.voices import save_voice
+
+    cfg = ElevenLabsProviderConfig(type="elevenlabs")
+    route = respx.post("https://api.elevenlabs.io/v1/text-to-voice").mock(
+        return_value=httpx.Response(200, json={"voice_id": "id-new"}))
+
+    voice_id = save_voice(cfg, "sk-test", name="vieille-reine",
+                          description="vieille reine rauque", generated_voice_id="gen-1")
+
+    assert voice_id == "id-new"
+    body = json.loads(route.calls.last.request.content)
+    assert body == {"voice_name": "vieille-reine",
+                    "voice_description": "vieille reine rauque",
+                    "generated_voice_id": "gen-1"}
+
+
+@respx.mock
+def test_cli_voices_design_without_save_lists_previews(tmp_path, monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-test")
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+    respx.post("https://api.elevenlabs.io/v1/text-to-voice/design").mock(
+        return_value=httpx.Response(200, json={"previews": [
+            {"generated_voice_id": "gen-1"}]}))
+
+    res = runner.invoke(app, ["voices", "design", "vieille reine rauque",
+                              "--project", str(tmp_path)])
+
+    assert res.exit_code == 0, res.output
+    assert "gen-1" in res.output
+    assert "--save" in res.output
+
+
+@respx.mock
+def test_cli_voices_design_save_prints_yaml_snippet(tmp_path, monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-test")
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+    respx.post("https://api.elevenlabs.io/v1/text-to-voice/design").mock(
+        return_value=httpx.Response(200, json={"previews": [
+            {"generated_voice_id": "gen-1"}]}))
+    respx.post("https://api.elevenlabs.io/v1/text-to-voice").mock(
+        return_value=httpx.Response(200, json={"voice_id": "id-new"}))
+
+    res = runner.invoke(app, ["voices", "design", "vieille reine rauque",
+                              "--name", "vieille-reine", "--save",
+                              "--project", str(tmp_path)])
+
+    assert res.exit_code == 0, res.output
+    assert "id-new" in res.output
+    assert "vieille-reine: id-new" in res.output
+
+
+def test_cli_voices_design_save_requires_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk-test")
+    (tmp_path / "forge.yaml").write_text(FORGE, encoding="utf-8")
+
+    res = runner.invoke(app, ["voices", "design", "desc", "--save",
+                              "--project", str(tmp_path)])
+
+    assert res.exit_code != 0
