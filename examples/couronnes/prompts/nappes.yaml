@@ -1,0 +1,44 @@
+# Couronnes & Cendres — Catalogue NAPPES / SOUNDSCAPES de fond
+# (ElevenLabs Sound Effects en boucle : loop: true, modèle eleven_text_to_sound_v2)
+# API   : forge generate nappes
+# STUDIO: forge studio nappes → elevenlabs.io/app/sound-effects, cocher « Loop », durée 30 s.
+
+direction: >-
+  Ambient background loop for a dark medieval fantasy board game, low and unobtrusive,
+  no musical melody, meant to sit quietly under a score. Seamless, no sudden events.
+
+defaults:
+  loop: true
+  duration_s: 30
+output_format: mp3_44100_128
+
+entries:
+  cite:
+    prompt: >-
+      The Citadel: distant murmur of a crowd in a stone plaza, faint tolling bells,
+      fluttering banners, echoing footsteps under high walls.
+
+  marche:
+    prompt: >-
+      The Market: bustling stalls, muffled haggling voices, clink of coins and
+      chains, creaking cart wheels, a low steady hum of trade.
+
+  caserne:
+    prompt: >-
+      The Barracks: rhythmic distant hammer on an anvil, forge fire crackle,
+      clatter of drilling arms, leather and iron in a cold yard.
+
+  confins:
+    prompt: >-
+      The Marches: bleak windswept frontier, gusting wind over dry grass, distant
+      crow calls, creaking timber, desolate and empty.
+
+  sanctuaire:
+    prompt: >-
+      The Sanctuary: ethereal choral drone, soft shimmering resonance, dripping water
+      in a vast crypt, a faint otherworldly ether hum.
+
+  fleau:
+    prompt: >-
+      The Plague near: a low corrupted rumble of grinding ash, faint whispering embers,
+      an oppressive subsonic dread that never quite resolves.

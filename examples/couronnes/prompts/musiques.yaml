@@ -1,0 +1,61 @@
+# Couronnes & Cendres — Catalogue MUSIQUES d'ambiance (ElevenLabs Music, POST /v1/music)
+# Génération API   : forge generate musiques        (nécessite un plan payant ElevenLabs)
+# Génération STUDIO: forge studio musiques  → coller chaque prompt dans elevenlabs.io/app/music
+#                    et enregistrer le résultat à l'emplacement « déposer » indiqué.
+
+direction: >-
+  Dark medieval fantasy orchestral score with a somber, weathered tone. Low strings,
+  distant war drums, plaintive solo cello, sparse choir pads used as texture only.
+  Restrained, cinematic, slow to mid tempo. Cold and grim atmosphere, seamless loopable
+  bed with a soft head/tail so it can repeat without an obvious seam.
+
+negative: >-
+  No lead vocals, no lyrics, no modern or electronic instruments, no drum machine,
+  no upbeat pop, no bright major-key fanfare, no sudden loud transients.
+
+defaults:
+  length_ms: 90000
+output_format: mp3_44100_128
+
+entries:
+  menu:
+    prompt: >-
+      Solemn brooding main theme for a title screen: slow rising strings over a low drone,
+      a lone distant horn, a sense of a ruined kingdom under ash. Noble but mournful.
+    length_ms: 90000
+
+  manche-calme:
+    prompt: >-
+      Quiet exploratory underscore for the early game: sparse plucked strings, soft
+      cello, patient and low-tension, leaving room to think. Barely-there percussion.
+    length_ms: 120000
+
+  tension:
+    prompt: >-
+      Rising dread as corruption spreads and the Plague stirs: pulsing low ostinato,
+      uneasy dissonant string swells, a slow ticking clock feel building pressure.
+    length_ms: 120000
+
+  combat:
+    prompt: >-
+      Driving battle cue for a clash of banners: urgent staccato strings, pounding war
+      drums, brass stabs, relentless and dangerous but still grim and restrained.
+    length_ms: 60000
+
+  final:
+    prompt: >-
+      Climactic endgame theme for the final reckoning: full sombre orchestra, heavy
+      drums, a mournful choir swell resolving into cold stillness.
+    length_ms: 90000
+
+  victoire:
+    prompt: >-
+      Short victory sting: a brief noble brass and string resolution, hard-won and
+      bittersweet rather than triumphant. About eight seconds.
+    length_ms: 10000
+
+  defaite:
+    prompt: >-
+      Short defeat sting: a descending minor cello line fading into ash and silence.
+      About eight seconds.
+    length_ms: 10000

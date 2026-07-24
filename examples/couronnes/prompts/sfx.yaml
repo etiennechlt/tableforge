@@ -1,0 +1,70 @@
+# Couronnes & Cendres — Catalogue EFFETS SONORES (ElevenLabs Sound Effects)
+# API   : forge generate sfx
+# STUDIO: forge studio sfx → elevenlabs.io/app/sound-effects, régler la durée indiquée.
+
+direction: >-
+  Short dry punchy board-game sound effect, dark medieval fantasy, tactile and physical,
+  clean with minimal reverb, no music, no voice.
+
+output_format: mp3_44100_128
+
+entries:
+  sfx-draw:
+    prompt: "A single quick paper card being drawn and sliding off a deck, crisp swish."
+    duration_s: 0.8
+
+  sfx-deploy:
+    prompt: "A thick playing card being firmly placed down on a wooden table, soft thud."
+    duration_s: 0.8
+
+  sfx-pawn-place:
+    prompt: "A small wooden game pawn set down onto a wooden board, short hollow knock."
+    duration_s: 0.7
+
+  sfx-pawn-move:
+    prompt: "A wooden pawn sliding a short distance across a board, brief muted scrape."
+    duration_s: 0.7
+
+  sfx-buy:
+    prompt: "A small handful of coins clinking together, a bright acquisitive chime tail."
+    duration_s: 1.2
+
+  sfx-intrigue:
+    prompt: "A dark arcane seal igniting, low occult whoosh with a shivering resonance."
+    duration_s: 1.3
+
+  sfx-intrigue-flash:
+    prompt: "A burning ember sigil flaring open, hot crackling whoosh, ominous."
+    duration_s: 1.3
+
+  sfx-flash-reveal:
+    prompt: "A single deep war horn blast and a low gong announcing a conflict."
+    duration_s: 1.8
+
+  sfx-combat:
+    prompt: "A sharp clash of two steel swords, a single decisive metallic hit."
+    duration_s: 1.2
+
+  sfx-attrition:
+    prompt: "A body falling and crumbling into a soft heap of ash and dust, grim."
+    duration_s: 1.2
+
+  sfx-plague-hop:
+    prompt: "A corrupted creature lurching forward, wet grinding ash with a subsonic growl."
+    duration_s: 1.3
+
+  sfx-control-flip:
+    prompt: "A heavy banner unfurling with a cloth flap and a brief resolving chime."
+    duration_s: 1.1
+
+  sfx-round:
+    prompt: "A single low bell toll marking the start of a new round, calm and heavy."
+    duration_s: 1.6
+
+  sfx-ui-click:
+    prompt: "A small soft wooden click for a user interface button press."
+    duration_s: 0.5
+
+  sfx-ui-error:
+    prompt: "A short low dull thud indicating an invalid action, discouraging."
+    duration_s: 0.6

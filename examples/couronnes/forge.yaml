@@ -1,11 +1,15 @@
 project: couronnes-cendres
 
-provider:
-  base_url: https://ark.ap-southeast.bytepluses.com/api/v3
-  api_key_env: ARK_API_KEY
-  model: seedream-5-0-260128
-  default_size: "4704x3520"
-  watermark: false
+providers:
+  ark:
+    type: seedream
+    base_url: https://ark.ap-southeast.bytepluses.com/api/v3
+    api_key_env: ARK_API_KEY
+    model: seedream-5-0-260128
+    default_size: "4704x3520"
+    watermark: false
+  eleven:
+    type: elevenlabs
 
 defaults:
   max_refs: 2
@@ -19,6 +23,7 @@ kinds:
     capture_selector: ".cc-card"
     render_size: { width: 744, height: 1039 }
     scale: 3
+    generate: { with: ark }
     sheet:
       page: A4
       cols: 3
@@ -33,3 +38,18 @@ kinds:
     capture_selector: ".cc-board"
     render_size: { width: 2480, height: 3508 }   # A4 @300 dpi
     scale: 1
+
+  musiques:
+    asset: music
+    prompts: prompts/musiques.yaml
+    generate: { with: eleven }
+
+  nappes:                       # soundscapes = sfx avec loop: true (defaults du catalogue)
+    asset: sfx
+    prompts: prompts/nappes.yaml
+    generate: { with: eleven }
+
+  sfx:
+    asset: sfx
+    prompts: prompts/sfx.yaml
+    generate: { with: eleven }
