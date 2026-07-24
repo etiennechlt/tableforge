@@ -113,8 +113,11 @@ class ProjectConfig(BaseModel):
 
     @property
     def provider(self) -> AnyProviderConfig:
-        # DÉPRÉCIÉ (compat v1) : à supprimer quand starter et tests n'utilisent
-        # plus le bloc `provider:` anonyme — revoir 2026-10.
+        """DEPRECATED — shim de compat v1 (bloc `provider:` anonyme).
+
+        À supprimer quand examples/ et le starter n'utilisent plus le format v1 —
+        revoir 2026-10.
+        """
         if "default" not in self.providers:
             raise KeyError(
                 "pas de provider 'default' (format v1) — utilise cfg.providers['<nom>']")
