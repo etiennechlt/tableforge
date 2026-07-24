@@ -1,8 +1,8 @@
 """Résolution des cibles d'un kind (pur, sans clé API ni réseau).
 
 `build_kind_spec` transforme la config + les fichiers data/prompts en un `KindSpec`
-immuable que les providers consomment (`plan`). Assets image/music/sfx implémentés
-ici ; tts/dialogue arrivent en P2, video en P3.
+immuable que les providers consomment (`plan`). Assets image/music/sfx/tts implémentés
+ici ; dialogue arrive en P2, video en P3.
 """
 from __future__ import annotations
 
@@ -54,14 +54,17 @@ def build_kind_spec(project: ProjectConfig, kind: str,
     provider_cfg = project.providers.get(provider_name)  # None si 'manual'
     options = kind_cfg.generate.extras() if kind_cfg.generate else {}
     if kind_cfg.asset in ("music", "sfx"):
-        return _audio_spec(project, kind_cfg, ids)
-    if kind_cfg.asset == "image":
+        targets, output_format = _audio_spec(kind_cfg, options, ids)
+    elif kind_cfg.asset == "image":
         targets = _image_targets(project, kind_cfg, provider_cfg, ids)
         output_format = getattr(provider_cfg, "output_format", None)
+    elif kind_cfg.asset == "tts":
+        targets = _tts_targets(project, kind_cfg, options, ids)
+        output_format = _catalog_output_format(kind_cfg)
     else:
         raise NotImplementedError(
             f"asset '{kind_cfg.asset}' : pas encore implémenté "
-            "(tts/dialogue : P2 ; video : P3)")
+            "(dialogue : P2 ; video : P3)")
     return KindSpec(kind=kind_cfg.name, asset=kind_cfg.asset,
                     provider_name=provider_name, options=options,
                     targets=tuple(targets), root=project.root,
@@ -149,16 +152,59 @@ def _sfx_targets(catalog_cfg: dict, options: dict,
     return tuple(targets)
 
 
-def _audio_spec(project: ProjectConfig, kind_cfg: KindConfig,
-                ids: Optional[list[str]]) -> KindSpec:
+def _audio_spec(kind_cfg: KindConfig, options: dict,
+                ids: Optional[list[str]]) -> tuple[tuple[Target, ...], Optional[str]]:
     catalog_cfg = _load_kind_catalog(kind_cfg)
-    options = kind_cfg.generate.extras() if kind_cfg.generate else {}
     if kind_cfg.asset == "music":
         targets = _music_targets(catalog_cfg, options, ids)
     else:
         targets = _sfx_targets(catalog_cfg, options, ids)
-    return KindSpec(kind=kind_cfg.name, asset=kind_cfg.asset,
-                    provider_name=resolve_provider_name(project, kind_cfg),
-                    options=options, targets=targets,
-                    output_format=catalog_cfg.get("output_format"),
-                    root=project.root)
+    return targets, catalog_cfg.get("output_format")
+
+
+# --- P2 : cibles vocales (tts) ---------------------------------------------
+
+def _resolve_voice(name: str, voices: dict[str, str], *, kind: str) -> str:
+    """Résout un nom humain de la map voices: en voice_id ElevenLabs."""
+    if name in voices:
+        return voices[name]
+    declared = ", ".join(sorted(voices)) if voices else "aucune"
+    raise KeyError(
+        f"kind '{kind}' : voix inconnue « {name} » (voix déclarées : {declared})")
+
+
+def _catalog_output_format(kind_cfg: KindConfig) -> Optional[str]:
+    if kind_cfg.prompts is None:
+        return None
+    return load_catalog(kind_cfg.prompts).get("output_format")
+
+
+def _tts_targets_from_catalog(project: ProjectConfig, kind_cfg: KindConfig,
+                              options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    cfg = _load_kind_catalog(kind_cfg)
+    target_ids = ids or list(catalog_entries(cfg))
+    default_voice = options.get("voice")
+    targets: list[Target] = []
+    for entry_id in target_ids:
+        entry = get_entry(cfg, entry_id)
+        text = entry.get("text") or entry.get("prompt")
+        if not text:
+            raise ValueError(
+                f"kind '{kind_cfg.name}', entrée '{entry_id}' : champ 'text' requis")
+        voice_name = entry.get("voice") or default_voice
+        if not voice_name:
+            raise ValueError(
+                f"kind '{kind_cfg.name}', entrée '{entry_id}' : aucune voix — déclare "
+                "generate.voice ou un champ voice dans l'entrée")
+        voice_id = _resolve_voice(str(voice_name), project.voices, kind=kind_cfg.name)
+        targets.append(Target(id=entry_id, text=str(text).strip(), voice_id=voice_id))
+    return tuple(targets)
+
+
+def _tts_targets(project: ProjectConfig, kind_cfg: KindConfig,
+                 options: dict, ids: Optional[list[str]]) -> tuple[Target, ...]:
+    if kind_cfg.prompts is not None:
+        return _tts_targets_from_catalog(project, kind_cfg, options, ids)
+    raise ValueError(
+        f"le kind tts '{kind_cfg.name}' : déclare generate.text + data, "
+        "ou un fichier prompts (catalogue)")
