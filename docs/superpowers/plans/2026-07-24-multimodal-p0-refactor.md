@@ -1467,6 +1467,14 @@ def generate_kind(project: ProjectConfig, kind: str, ids: Optional[list[str]] = 
     return results
 ```
 
+**Déviation acceptée et documentée (revue Task 8)** : en v1, un appel non-dry-run
+sans clé API levait `RuntimeError` AVANT la boucle, même si toutes les destinations
+existaient déjà (tout aurait été skippé). Avec plan/execute, la clé n'est lue qu'au
+premier `execute()` réel : un run entièrement skippé réussit désormais **sans clé**.
+C'est intentionnel — le flux studio (déposer les fichiers à la main puis relancer)
+et la relance de `forge all` sans `.env` en dépendent. Seul signal perdu : le message
+informatif « (génération ignorée : …) » de `forge all` quand tout existe déjà.
+
 Points de comportement conservés (c'est le filet, pas une intention) :
 - dry-run sans clé : `provider_for` construit un Seedream keyless, `plan()` ne lit jamais l'env ;
 - `ValueError` « n'a pas de fichier prompts » levée par `build_kind_spec` AVANT toute résolution réseau ;
