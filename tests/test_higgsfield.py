@@ -10,7 +10,8 @@ from pydantic import ValidationError
 
 from tableforge.config import HiggsfieldProviderConfig
 from tableforge.providers.higgsfield import (HiggsfieldProvider, HiggsfieldVideoOptions,
-                                             _result_url, build_submit, poll, submit)
+                                             _download_result, _result_url, build_submit,
+                                             poll, submit)
 from tableforge.targets import KindSpec, Target
 
 BASE = "https://platform.higgsfield.ai"
@@ -67,6 +68,20 @@ def test_submit_without_request_id_raises_french_error():
 
     # Act / Assert
     with pytest.raises(RuntimeError, match="request_id"):
+        submit(_cfg(), build_submit("some/slug", {"prompt": "x"}),
+               api_key="k", api_secret="s")
+
+
+@respx.mock
+def test_submit_non_json_response_raises_french_error():
+    # Arrange — 200 mais corps non JSON (ex. page d'erreur HTML d'un proxy/CDN) :
+    # fold-in revue finale P3a — ne doit PAS laisser fuiter json.JSONDecodeError brut.
+    respx.post(f"{BASE}/some/slug").mock(
+        return_value=httpx.Response(200, content=b"<html>not json</html>"))
+
+    # Act / Assert — RuntimeError (français) : si un JSONDecodeError brut fuitait,
+    # pytest.raises(RuntimeError) échouerait (type non levé).
+    with pytest.raises(RuntimeError, match="JSON"):
         submit(_cfg(), build_submit("some/slug", {"prompt": "x"}),
                api_key="k", api_secret="s")
 
@@ -159,6 +174,35 @@ def test_poll_times_out_with_explicit_error():
     assert sleeps == [5.0, 5.0, 5.0]
 
 
+@respx.mock
+def test_poll_tolerates_transient_network_errors_then_succeeds():
+    # Arrange — 3 erreurs réseau consécutives (fold-in revue finale P3a) puis succès :
+    # tolérées, pas de RuntimeError, le statut 'completed' est bien retourné.
+    respx.get(f"{BASE}/requests/req-42/status").mock(side_effect=[
+        httpx.ConnectError("boom"), httpx.ConnectError("boom"), httpx.ConnectError("boom"),
+        httpx.Response(200, json={"status": "completed", "video": {"url": "u"}}),
+    ])
+    sleeps = []
+
+    # Act
+    payload = poll(_cfg(), "req-42", api_key="k", api_secret="s", sleep=sleeps.append)
+
+    # Assert
+    assert payload["video"]["url"] == "u"
+    assert sleeps == [5.0, 5.0, 5.0]
+
+
+@respx.mock
+def test_poll_raises_after_too_many_consecutive_network_errors():
+    # Arrange — 4 erreurs réseau consécutives : dépasse la tolérance (3)
+    respx.get(f"{BASE}/requests/req-42/status").mock(
+        side_effect=[httpx.ConnectError("boom")] * 4)
+
+    # Act / Assert — RuntimeError français portant le request_id
+    with pytest.raises(RuntimeError, match="req-42"):
+        poll(_cfg(), "req-42", api_key="k", api_secret="s", sleep=lambda _s: None)
+
+
 def test_result_url_uses_verified_video_key():
     # Arrange / Act / Assert — schéma CONFIRMÉ (Task 2, docs.higgsfield.ai) :
     # {"video": {"url": ...}} pour un asset vidéo.
@@ -180,6 +224,27 @@ def test_result_url_fallbacks_when_video_key_absent():
     assert _result_url({"url": "d"}) == "d"
     with pytest.raises(RuntimeError, match="docs.higgsfield.ai"):
         _result_url({"status": "completed"})
+
+
+def test_result_url_uses_images_key_for_image_shape():
+    # Arrange / Act / Assert — schéma CONFIRMÉ (fold-in Task 3, docs.higgsfield.ai) :
+    # {"images": [{"url": ...}]} pour un asset image. NOTE (FR) : seule la première
+    # image de la liste est retenue — limitation multi-images assumée (voir docstring
+    # de _result_url).
+    payload = {"status": "completed",
+              "images": [{"url": "https://cdn.x/a.png"}, {"url": "https://cdn.x/b.png"}]}
+    assert _result_url(payload) == "https://cdn.x/a.png"
+
+
+def test_result_url_video_key_wins_over_images_key():
+    # Arrange / Act / Assert — priorité documentée : "video" avant "images"
+    payload = {"video": {"url": "primary"}, "images": [{"url": "secondary"}]}
+    assert _result_url(payload) == "primary"
+
+
+def test_result_url_images_accepts_bare_string_items():
+    # Arrange / Act / Assert — repli str, symétrique à `results: ["b"]`
+    assert _result_url({"images": ["https://cdn.x/a.png"]}) == "https://cdn.x/a.png"
 
 
 def _spec(tmp_path, targets, options=None, kind="teaser"):
@@ -219,7 +284,7 @@ def test_plan_t2v_builds_submit_jobs(tmp_path):
     assert job.request["path"] == "/kling-video/v2.1/standard/text-to-video"
     assert job.request["json"] == {"prompt": "A ruined throne room",
                                    "aspect_ratio": "16:9", "duration": 8}
-    assert job.payload["submit"]["json"] == job.request["json"]
+    assert job.payload["json"] == job.request["json"]
 
 
 def test_plan_t2v_includes_resolution_when_set(tmp_path):
@@ -236,7 +301,7 @@ def test_plan_t2v_includes_resolution_when_set(tmp_path):
 
     # Assert
     assert job.request["json"]["resolution"] == "1080p"
-    assert job.payload["submit"]["json"]["resolution"] == "1080p"
+    assert job.payload["json"]["resolution"] == "1080p"
 
 
 def test_plan_kind_duration_is_fallback_only(tmp_path):
@@ -268,7 +333,7 @@ def test_plan_i2v_encodes_source_image_only_in_payload(tmp_path):
     job = provider.plan(spec)[0]
 
     # Assert — data-URL dans payload, jamais dans request
-    assert job.payload["submit"]["json"]["image"].startswith("data:image/jpeg;base64,")
+    assert job.payload["json"]["image"].startswith("data:image/jpeg;base64,")
     assert job.request["json"]["image"] == f"[image source : {art}]"
     assert "data:" not in str(job.request)
     assert job.dest == tmp_path / "out" / "video" / "cartes-animees" / "lame.mp4"
@@ -288,7 +353,7 @@ def test_plan_i2v_missing_art_defers_error_to_execute(tmp_path):
     job = provider.plan(spec)[0]
 
     # Assert
-    assert "image" not in job.payload["submit"]["json"]
+    assert "image" not in job.payload["json"]
     assert job.request["json"]["image"] == f"[image source : {art}]"
     assert note in job.notes
     with pytest.raises(RuntimeError, match="art source manquant"):
@@ -330,6 +395,37 @@ def test_execute_submits_polls_downloads(tmp_path, monkeypatch, capsys):
     assert submit_route.calls.last.request.headers["authorization"] == "Key k:s"
     out = capsys.readouterr().out
     assert "intro: completed" in out
+
+
+@respx.mock
+def test_download_result_follows_redirects(tmp_path):
+    # Arrange — fold-in revue finale P3a : follow_redirects=True au téléchargement
+    respx.get("https://cdn.x/first").mock(
+        return_value=httpx.Response(302, headers={"location": "https://cdn.x/final"}))
+    respx.get("https://cdn.x/final").mock(return_value=httpx.Response(200, content=b"BYTES"))
+    dest = tmp_path / "out.mp4"
+
+    # Act
+    saved = _download_result({"video": {"url": "https://cdn.x/first"}}, dest,
+                             kind="teaser", asset="video")
+
+    # Assert
+    assert saved == dest
+    assert dest.read_bytes() == b"BYTES"
+
+
+@respx.mock
+def test_download_result_http_error_goes_through_hints(tmp_path):
+    # Arrange — fold-in revue finale P3a : erreur HTTP au téléchargement passe par
+    # raise_with_hint (français), pas un httpx.HTTPStatusError brut.
+    respx.get("https://cdn.x/missing").mock(return_value=httpx.Response(404, json={}))
+    dest = tmp_path / "out.mp4"
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="404"):
+        _download_result({"video": {"url": "https://cdn.x/missing"}}, dest,
+                         kind="teaser", asset="video")
+    assert not dest.exists()
 
 
 def test_execute_requires_both_keys(tmp_path, monkeypatch):

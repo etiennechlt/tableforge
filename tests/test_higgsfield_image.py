@@ -1,7 +1,9 @@
 """Tests P3b — images via Higgsfield : capacités, options, plan, execute."""
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 from pydantic import ValidationError
 
 from tableforge.config import HiggsfieldProviderConfig
@@ -126,3 +128,36 @@ def test_plan_image_propagates_target_notes(tmp_path):
 
     # Assert
     assert job.notes == ("avertissement",)
+
+
+@respx.mock
+def test_execute_image_job_reuses_submit_poll_download(tmp_path, monkeypatch):
+    # Arrange
+    monkeypatch.setenv("HIGGSFIELD_API_KEY", "k")
+    monkeypatch.setenv("HIGGSFIELD_API_SECRET", "s")
+    provider = _provider()
+    job = provider.plan(_image_spec(tmp_path))[0]
+    submit_route = respx.post(
+        "https://platform.higgsfield.ai/higgsfield-ai/soul/standard"
+    ).mock(return_value=httpx.Response(200, json={"request_id": "req-1"}))
+    # ADAPTATION : forme "completed" = clé dédiée "images" (CONFIRMÉE par
+    # docs.higgsfield.ai, cf. NB en tête de higgsfield.py et fold-in Task 3),
+    # plutôt que le "result" hypothétique du brief — exerce la branche
+    # _result_url() ajoutée par cette tâche pour l'asset image.
+    respx.get("https://platform.higgsfield.ai/requests/req-1/status").mock(
+        return_value=httpx.Response(200, json={
+            "status": "completed",
+            "images": [{"url": "https://cdn.higgsfield.ai/out/lame.png"}]}))
+    respx.get("https://cdn.higgsfield.ai/out/lame.png").mock(
+        return_value=httpx.Response(200, content=b"PNGDATA"))
+
+    # Act
+    saved = provider.execute(job)
+
+    # Assert
+    assert saved == [job.dest]
+    assert job.dest.read_bytes() == b"PNGDATA"
+    sent = submit_route.calls.last.request
+    assert sent.headers["Authorization"] == "Key k:s"
+    assert b'"prompt": "A footman. Dark fantasy."' in sent.content or \
+           b'"prompt":"A footman. Dark fantasy."' in sent.content

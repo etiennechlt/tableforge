@@ -8,10 +8,11 @@ NB (Step 0, P3a Task 2) — vérification doc API (docs.higgsfield.ai) :
     `completed` DIFFÈRE de l'hypothèse initiale `{"results": [{"url": ...}]}` : la doc
     montre plutôt des clés dédiées par type de média, ex. `"images": [{"url": ...}]`
     pour de la génération d'image et `"video": {"url": ...}` pour de la vidéo.
-    `poll()` (Task 3, ci-dessous) consomme ce endpoint ; `_result_url()` utilise la
-    clé dédiée `"video"` en priorité et conserve `results[].url`/`result.url`/`url`
-    comme replis (l'API peut varier selon le modèle) — voir la docstring de
-    `_result_url` pour l'ordre exact.
+    `poll()` consomme ce endpoint ; `_result_url()` (P3b Task 3) utilise la clé dédiée
+    `"video"` en priorité, puis `"images"` (premier élément — limitation multi-images
+    assumée, cf. docstring), et conserve `results[].url`/`result.url`/`url` comme replis
+    (l'API peut varier selon le modèle) — voir la docstring de `_result_url` pour
+    l'ordre exact.
   - Champ image (i2v) et champ durée : NON CONFIRMÉS par la doc consultée (les
     exemples de la page ne couvrent que `prompt`/`aspect_ratio`/`resolution`).
     Hypothèses à vérifier dans les Tasks 3–5 : `"image"` (data-URL acceptée) et
@@ -58,12 +59,21 @@ def submit(cfg, req: dict, *, api_key: str, api_secret: str, kind: str = "video"
                           timeout=SUBMIT_TIMEOUT)
     if response.is_error:
         raise_with_hint(response, provider_type="higgsfield", asset=asset, kind=kind)
-    request_id = response.json().get("request_id")
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Higgsfield : réponse de soumission non JSON (statut {response.status_code}) "
+            "— vérifie l'URL de base et le slug du modèle sur docs.higgsfield.ai.") from exc
+    request_id = data.get("request_id")
     if not request_id:
         raise RuntimeError(
             "Higgsfield : réponse de soumission sans 'request_id' — vérifie le slug du "
             "modèle et le format de l'API sur docs.higgsfield.ai.")
     return str(request_id)
+
+
+_MAX_TRANSIENT_POLL_ERRORS = 3
 
 
 def poll(cfg, request_id: str, *, api_key: str, api_secret: str,
@@ -74,8 +84,21 @@ def poll(cfg, request_id: str, *, api_key: str, api_secret: str,
     headers = _auth_headers(api_key, api_secret)
     elapsed = 0.0
     last_status: Optional[str] = None
+    transient_errors = 0
     while True:
-        response = httpx.get(status_url, headers=headers, timeout=SUBMIT_TIMEOUT)
+        try:
+            response = httpx.get(status_url, headers=headers, timeout=SUBMIT_TIMEOUT)
+        except httpx.RequestError as exc:
+            transient_errors += 1
+            if transient_errors > _MAX_TRANSIENT_POLL_ERRORS:
+                raise RuntimeError(
+                    f"Higgsfield : requête {request_id} — {transient_errors} erreurs "
+                    f"réseau consécutives au sondage du statut ({exc}) — vérifie ta "
+                    "connexion et relance.") from exc
+            sleep(cfg.poll_interval_s)
+            elapsed += cfg.poll_interval_s
+            continue
+        transient_errors = 0
         if response.is_error:
             raise_with_hint(response, provider_type="higgsfield", asset=asset, kind=kind)
         payload = response.json()
@@ -107,10 +130,15 @@ def _result_url(payload: dict) -> str:
          vidéo (`{"video": {"url": ...}}`), par symétrie avec `{"images": [...]}`
          pour la génération d'image. C'est la forme attendue en pratique par ce
          module (provider vidéo).
-      2. `results[0].url` / `results[0]` (str) — forme hypothétique initiale du
+      2. `images[0].url` — clé DÉDIÉE CONFIRMÉE par docs.higgsfield.ai pour un asset
+         image (`{"images": [{"url": ...}]}`, P3b Task 3). NOTE (FR) : seule la
+         PREMIÈRE image de la liste est retenue — limitation multi-images assumée
+         (ce provider ne génère qu'un seul fichier par cible ; une génération qui
+         renverrait plusieurs images ne sauvegarderait que la première).
+      3. `results[0].url` / `results[0]` (str) — forme hypothétique initiale du
          brief, conservée en repli : l'API peut varier selon le modèle.
-      3. `result.url`.
-      4. `url` à la racine du payload.
+      4. `result.url`.
+      5. `url` à la racine du payload.
     Si aucune de ces formes ne correspond : RuntimeError pointant vers la doc.
     """
     video = payload.get("video")
@@ -118,6 +146,16 @@ def _result_url(payload: dict) -> str:
         for key in _RESULT_URL_KEYS:
             if video.get(key):
                 return str(video[key])
+
+    images = payload.get("images")
+    if isinstance(images, list) and images:
+        first = images[0]
+        if isinstance(first, dict):
+            for key in _RESULT_URL_KEYS:
+                if first.get(key):
+                    return str(first[key])
+        if isinstance(first, str) and first:
+            return first
 
     results = payload.get("results")
     if isinstance(results, list) and results:
@@ -144,6 +182,23 @@ def _result_url(payload: dict) -> str:
 
 
 DOWNLOAD_TIMEOUT = 300.0
+
+
+def _download_result(payload: dict, dest: Path, *, kind: str, asset: str) -> Path:
+    """Télécharge le résultat d'une réponse `completed` vers `dest` (image ou vidéo).
+
+    Durcissement (fold-in revue finale P3a) : `follow_redirects=True` (les CDN
+    higgsfield peuvent rediriger vers l'URL finale du fichier) et les erreurs HTTP
+    (4xx/5xx) passent par `raise_with_hint` (message français actionnable), au lieu
+    d'un `httpx.HTTPStatusError` brut.
+    """
+    url = _result_url(payload)
+    response = httpx.get(url, timeout=DOWNLOAD_TIMEOUT, follow_redirects=True)
+    if response.is_error:
+        raise_with_hint(response, provider_type="higgsfield", asset=asset, kind=kind)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(response.content)
+    return dest
 
 
 class HiggsfieldVideoOptions(BaseModel):
@@ -185,25 +240,33 @@ class HiggsfieldProvider:
                    poll_interval_s=cfg.poll_interval_s, poll_timeout_s=cfg.poll_timeout_s)
 
     def _plan_video(self, spec: KindSpec) -> list[AssetJob]:
+        # NB (P3b Task 3, verrou execute() partagé) : `payload` est PLAT
+        # ({"path", "json", "kind", "asset", "missing_source"?}), même forme que
+        # `_plan_image` ci-dessous — c'est ce dict qui est passé tel quel à `submit()`
+        # (`req["path"]`/`req["json"]`) par `execute()`, sans wrapper `"submit"`.
         options = HiggsfieldVideoOptions(**spec.options)
         jobs: list[AssetJob] = []
         for target in spec.targets:
             body = _video_body(target, options)
             summary_body = dict(body)
-            payload: dict = {"kind": spec.kind, "asset": "video"}
+            missing_source: Optional[str] = None
             if target.source_image is not None:
                 summary_body["image"] = f"[image source : {target.source_image}]"
                 if target.source_image.exists():
                     body = {**body, "image": encode_image_data_url(target.source_image)}
                 else:
-                    payload["missing_source"] = (
+                    missing_source = (
                         f"art source manquant : {target.source_image} — génère d'abord "
                         "l'art du kind source (forge generate).")
-            payload["submit"] = build_submit(options.model, body)
+            payload = build_submit(options.model, body)
+            payload["kind"] = spec.kind
+            payload["asset"] = "video"
+            if missing_source is not None:
+                payload["missing_source"] = missing_source
             jobs.append(AssetJob(
                 id=target.id,
                 dest=asset_path(spec.root, "video", spec.kind, target.id),
-                request={"path": payload["submit"]["path"], "json": summary_body},
+                request={"path": payload["path"], "json": summary_body},
                 payload=payload,
                 notes=target.notes,
             ))
@@ -216,6 +279,7 @@ class HiggsfieldProvider:
             body = build_image_body(target.text, options=spec.options,
                                     refs=target.refs)
             payload = build_submit(slug, body)
+            payload["kind"] = spec.kind
             payload["asset"] = "image"
             request = copy.deepcopy(payload)
             refs = request["json"].get(IMAGE_REF_FIELD)
@@ -250,24 +314,22 @@ class HiggsfieldProvider:
         return key, secret
 
     def execute(self, job: AssetJob) -> list[Path]:
+        # Verrou (P3b Task 3) : chemin UNIQUE, piloté par `job.payload`/`job.dest` —
+        # aucun branchement par asset. `job.payload` (plat) est passé tel quel à
+        # `submit()` (qui ne lit que `["path"]`/`["json"]`) pour image comme vidéo.
         missing_source = job.payload.get("missing_source")
         if missing_source:
             raise RuntimeError(missing_source)
         api_key, api_secret = self._require_keys()
         kind = str(job.payload.get("kind", "video"))
         asset = str(job.payload.get("asset", "video"))
-        request_id = submit(self, job.payload["submit"],
+        request_id = submit(self, job.payload,
                             api_key=api_key, api_secret=api_secret, kind=kind, asset=asset)
         typer.echo(f"  {job.id}: requête higgsfield {request_id}")
-        payload = poll(self, request_id, api_key=api_key, api_secret=api_secret,
-                       sleep=self.sleep, kind=kind, asset=asset,
-                       on_status=lambda status: typer.echo(f"  {job.id}: {status}"))
-        url = _result_url(payload)
-        response = httpx.get(url, timeout=DOWNLOAD_TIMEOUT)
-        response.raise_for_status()
-        job.dest.parent.mkdir(parents=True, exist_ok=True)
-        job.dest.write_bytes(response.content)
-        return [job.dest]
+        status = poll(self, request_id, api_key=api_key, api_secret=api_secret,
+                      sleep=self.sleep, kind=kind, asset=asset,
+                      on_status=lambda state: typer.echo(f"  {job.id}: {state}"))
+        return [_download_result(status, job.dest, kind=kind, asset=asset)]
 
 
 # --- P3b : images (Soul / Seedream servis par Higgsfield) --------------------
