@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Sequence
 
 import httpx
 from dotenv import load_dotenv
@@ -21,11 +21,14 @@ from .base import AssetJob
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..config import ElevenLabsProviderConfig
-    from ..targets import KindSpec
+    from ..targets import DialogueLine, KindSpec
 
 MUSIC_PATH = "/v1/music"
 SFX_PATH = "/v1/sound-generation"
+TTS_PATH = "/v1/text-to-speech"
+DIALOGUE_PATH = "/v1/text-to-dialogue"
 DEFAULT_TIMEOUT = 180.0
+DIALOGUE_SOFT_LIMIT = 2000
 
 
 def build_music_request(prompt: str, *, length_ms: int, output_format: str) -> dict:
@@ -42,6 +45,26 @@ def build_sfx_request(text: str, *, duration_s: Optional[float], loop: bool, mod
     if duration_s is not None:
         body["duration_seconds"] = clamp_sfx_duration_s(duration_s)
     return {"path": SFX_PATH, "json": body, "params": {"output_format": output_format}}
+
+
+def build_tts_request(text: str, *, voice_id: str, model: str,
+                      language: Optional[str] = None, seed: Optional[int] = None,
+                      output_format: str) -> dict:
+    body: dict = {"text": text, "model_id": model}
+    if language:
+        body["language_code"] = language
+    if seed is not None:
+        body["seed"] = seed
+    return {"path": f"{TTS_PATH}/{voice_id}", "json": body,
+            "params": {"output_format": output_format}}
+
+
+def build_dialogue_request(lines: "Sequence[DialogueLine]", *, model: str,
+                           output_format: str) -> dict:
+    inputs = [{"text": line.text, "voice_id": line.voice_id} for line in lines]
+    return {"path": DIALOGUE_PATH,
+            "json": {"inputs": inputs, "model_id": model},
+            "params": {"output_format": output_format}}
 
 
 @dataclass(frozen=True)
