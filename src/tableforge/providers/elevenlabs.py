@@ -1,8 +1,10 @@
 """Provider audio ElevenLabs — REST direct httpx, mockable respx.
 
 P1 : music (POST /v1/music) + sfx/soundscapes (POST /v1/sound-generation, loop).
-P2 ajoutera tts et dialogue. `plan()` est pur (aucune clé) ; `execute()` est le
-seul point qui lit la clé (dotenv + env) et touche le réseau.
+P2 : tts (POST /v1/text-to-speech/{voice_id}) + dialogue (POST /v1/text-to-dialogue,
+avertissement au-delà de DIALOGUE_SOFT_LIMIT caractères cumulés). `plan()` est pur
+(aucune clé) ; `execute()` est le seul point qui lit la clé (dotenv + env) et
+touche le réseau.
 """
 from __future__ import annotations
 
@@ -67,6 +69,14 @@ def build_dialogue_request(lines: "Sequence[DialogueLine]", *, model: str,
             "params": {"output_format": output_format}}
 
 
+def _dialogue_length_notes(lines: "Sequence[DialogueLine]") -> tuple[str, ...]:
+    total = sum(len(line.text) for line in lines)
+    if total <= DIALOGUE_SOFT_LIMIT:
+        return ()
+    return (f"dialogue long : {total} caractères (> {DIALOGUE_SOFT_LIMIT}) — "
+            "l'API ElevenLabs peut tronquer ou refuser",)
+
+
 @dataclass(frozen=True)
 class ElevenLabsProvider:
     api_key_env: str
@@ -83,26 +93,40 @@ class ElevenLabsProvider:
                    tts_model=cfg.tts_model, dialogue_model=cfg.dialogue_model)
 
     def plan(self, spec: "KindSpec") -> list[AssetJob]:
-        if spec.asset not in ("music", "sfx"):
+        if spec.asset not in ("music", "sfx", "tts", "dialogue"):
             raise NotImplementedError(
                 f"elevenlabs : asset '{spec.asset}' pas encore pris en charge (P2)")
         output_format = spec.output_format or self.output_format
         jobs: list[AssetJob] = []
         for target in spec.targets:
+            notes = target.notes
             if spec.asset == "music":
                 req = build_music_request(target.text,
                                           length_ms=target.settings["length_ms"],
                                           output_format=output_format)
-            else:
+            elif spec.asset == "sfx":
                 req = build_sfx_request(target.text,
                                         duration_s=target.settings.get("duration_s"),
                                         loop=bool(target.settings.get("loop", False)),
                                         model=self.sfx_model,
                                         output_format=output_format)
+            elif spec.asset == "tts":
+                req = build_tts_request(target.text,
+                                        voice_id=target.voice_id,
+                                        model=spec.options.get("model") or self.tts_model,
+                                        language=spec.options.get("language"),
+                                        seed=spec.options.get("seed"),
+                                        output_format=output_format)
+            else:
+                req = build_dialogue_request(target.lines,
+                                             model=spec.options.get("model")
+                                             or self.dialogue_model,
+                                             output_format=output_format)
+                notes = target.notes + _dialogue_length_notes(target.lines)
             dest = asset_path(spec.root, spec.asset, spec.kind, target.id, output_format)
             jobs.append(AssetJob(id=target.id, dest=dest, request=req,
                                  payload={**req, "asset": spec.asset, "kind": spec.kind},
-                                 notes=target.notes))
+                                 notes=notes))
         return jobs
 
     def _require_key(self) -> str:

@@ -86,9 +86,9 @@ def test_plan_builds_sfx_jobs_with_loop_and_notes():
 
 
 def test_plan_unsupported_asset_raises():
-    spec = KindSpec(kind="narration", asset="tts", provider_name="eleven", options={},
+    spec = KindSpec(kind="clip", asset="video", provider_name="eleven", options={},
                     targets=(), output_format=None, root=Path("/proj"))
-    with pytest.raises(NotImplementedError, match="tts"):
+    with pytest.raises(NotImplementedError, match="video"):
         _provider().plan(spec)
 
 
