@@ -35,3 +35,15 @@ def test_init_creates_audio_catalogs_and_named_providers(tmp_path):
     assert "ELEVENLABS_API_KEY" in env
     assert "HIGGSFIELD_API_KEY" in env
     assert "HIGGSFIELD_API_SECRET" in env
+
+
+def test_init_ships_commented_tts_examples(tmp_path):
+    target = init_project("mon-jeu", tmp_path)
+
+    forge = (target / "forge.yaml").read_text(encoding="utf-8")
+    assert "# narration:" in forge
+    assert "asset: tts" in forge
+    assert "voices:" in forge
+    catalog = (target / "prompts" / "regles-audio.yaml").read_text(encoding="utf-8")
+    assert "entries:" in catalog
+    assert "text:" in catalog

@@ -43,4 +43,26 @@ kinds:
     prompts: prompts/sfx.yaml
     generate: { with: eleven }
 
-# Autres assets à venir : tts, dialogue (voix), video — voir la doc tableforge.
+# --- Voix (ElevenLabs) : exemples à décommenter
+# 1. Ajoute un provider elevenlabs (clé : ELEVENLABS_API_KEY dans .env) :
+#   providers:
+#     eleven:
+#       type: elevenlabs
+# 2. Déclare tes voix (noms humains -> voice_id, cf. `forge voices list`) :
+#   voices:
+#     narrateur: JBFqnCBsd6RMkjVDRZzb
+# 3. Ajoute deux kinds vocaux :
+#
+# narration:                      # TTS pour chaque carte (gabarit Jinja)
+#   asset: tts
+#   data: data/cards.yaml
+#   generate:
+#     with: eleven
+#     voice: narrateur
+#     text: "{{ name }}. {{ eff }}"
+#     language: fr
+#
+# regles-audio:                   # Catalogue TTS libre (voir prompts/regles-audio.yaml)
+#   asset: tts
+#   prompts: prompts/regles-audio.yaml
+#   generate: { with: eleven, voice: narrateur, language: fr }

@@ -1,0 +1,5 @@
+# Catalogue TTS « libre » (kind sans data) : chaque entrée porte un champ text.
+# Utilisé par le kind d'exemple regles-audio (commenté dans forge.yaml).
+entries:
+  mise-en-place: { text: "Placez le plateau au centre. Chaque joueur prend cinq cartes." }
+  rappel-regle: { text: "Une seule carte peut être jouée par tour." }
